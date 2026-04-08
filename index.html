@@ -1,813 +1,1004 @@
 <!DOCTYPE html>
 <html lang="fi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lillin Akvarellit</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Georgia', serif;
-            background: #d8d0c8;
-            padding: 1.5rem;
-        }
-        h1 { text-align: center; color: #4a3728; font-size: 2rem; margin-bottom: 0.25rem; }
-        .subtitle { text-align: center; color: #7a6558; margin-bottom: 1rem; font-size: 0.9rem; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lillin Akvarellit</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0908; }
+  canvas#c { display: block; width: 100%; height: 100%; }
 
-        .save-bar {
-            max-width: 960px;
-            margin: 0 auto 1.5rem;
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            justify-content: center;
-        }
-        .save-bar button {
-            padding: 0.5rem 1.2rem;
-            border: none;
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 0.85rem;
-            cursor: pointer;
-            background: #4a3728;
-            color: white;
-        }
-        .save-bar button:hover { background: #5d4a3a; }
-        .save-bar .status { font-size: 0.8rem; color: #7a6558; }
+  #title {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 50; pointer-events: none;
+    transition: opacity 1.5s;
+  }
+  #title.hidden { opacity: 0; }
+  #title h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300; font-size: clamp(2rem, 6vw, 5rem);
+    color: #d8cec2; letter-spacing: 0.25em;
+    opacity: 0; animation: fi 2s ease-out 0.3s forwards;
+  }
+  #title .sub {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300; font-style: italic;
+    font-size: clamp(0.65rem, 1.3vw, 0.9rem);
+    color: #4a4038; letter-spacing: 0.15em;
+    margin-top: 1.2rem; opacity: 0;
+    animation: fi 2s ease-out 1.2s forwards;
+  }
+  @keyframes fi { to { opacity: 1; } }
 
-        .undo-bar {
-            max-width: 960px;
-            margin: 0 auto 1rem;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: #f5e6d0;
-            border: 1px solid #d4c0a8;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            color: #4a3728;
-        }
-        .undo-bar.visible { display: flex; }
-        .undo-bar button {
-            padding: 0.35rem 0.9rem;
-            border: none;
-            border-radius: 5px;
-            font-family: inherit;
-            font-size: 0.8rem;
-            cursor: pointer;
-            background: #7a6558;
-            color: white;
-        }
-        .undo-bar button:hover { background: #5d4a3a; }
+  #counter {
+    position: fixed; bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.7rem; letter-spacing: 0.3em;
+    color: rgba(200,180,160,0.3);
+    z-index: 100; pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
 
-        .swap-bar {
-            max-width: 960px;
-            margin: 0 auto 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            color: #4a3728;
-        }
-        .swap-bar label { font-weight: bold; }
-        .swap-bar input[type="text"] {
-            width: 60px;
-            padding: 0.35rem 0.5rem;
-            border: 1px solid #c0b0a0;
-            border-radius: 5px;
-            font-family: inherit;
-            font-size: 0.85rem;
-            text-align: center;
-            background: white;
-        }
-        .swap-bar button {
-            padding: 0.35rem 0.9rem;
-            border: none;
-            border-radius: 5px;
-            font-family: inherit;
-            font-size: 0.85rem;
-            cursor: pointer;
-            background: #4a3728;
-            color: white;
-        }
-        .swap-bar button:hover { background: #5d4a3a; }
-        .swap-bar .swap-status {
-            font-size: 0.75rem;
-            color: #a05050;
-            min-width: 120px;
-        }
+  #loader {
+    position: fixed; inset: 0; background: #0a0908;
+    z-index: 9999; display: flex;
+    align-items: center; justify-content: center;
+    transition: opacity 1s;
+  }
+  #loader.gone { opacity: 0; pointer-events: none; }
+  #loader p {
+    font-family: 'Cormorant Garamond', serif;
+    color: #3a342e; font-size: 0.8rem;
+    letter-spacing: 0.4em; font-weight: 300;
+  }
 
-        /* Single A4 page (cover / back cover) */
-        .a4 {
-            position: relative;
-            aspect-ratio: 210 / 297;
-            background: white;
-            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 0.842% 1.190%; /* 2.5mm */
-        }
-        .a4 img {
-            max-width: 100%;
-            max-height: 100%;
-            display: block;
-            object-fit: contain;
-        }
+  /* ===== SETTINGS PANEL ===== */
+  #panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 320px;
+    background: rgba(15,13,11,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-left: 1px solid rgba(200,180,160,0.1);
+    z-index: 200;
+    overflow-y: auto;
+    padding: 1.2rem 1rem;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    color: #a09080;
+    transform: translateX(100%);
+    transition: transform 0.35s ease;
+    scrollbar-width: thin;
+    scrollbar-color: #3a3028 transparent;
+  }
+  #panel.open { transform: translateX(0); }
+  #panel::-webkit-scrollbar { width: 4px; }
+  #panel::-webkit-scrollbar-thumb { background: #3a3028; border-radius: 2px; }
 
-        /* Cover: single centered page */
-        .cover-wrap {
-            max-width: 480px;
-            margin: 0 auto 1.5rem;
-        }
+  #panel h2 {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: #c8b8a4; margin: 1.2rem 0 0.6rem; padding-bottom: 0.3rem;
+    border-bottom: 1px solid rgba(200,180,160,0.1);
+  }
+  #panel h2:first-child { margin-top: 0; }
 
-        /* Spread: two A4 pages side by side */
-        .spread {
-            max-width: 960px;
-            margin: 0 auto 1.5rem;
-            display: flex;
-            gap: 0;
-            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
-        }
-        .spread .a4 {
-            flex: 1;
-            box-shadow: none;
-        }
-        .spread .a4.left { border-right: 1px solid #e0d8d0; }
+  .ctrl { display: flex; align-items: center; gap: 8px; margin: 0.4rem 0; }
+  .ctrl label { flex: 0 0 90px; font-size: 10px; color: #8a7a6a; }
+  .ctrl input[type="range"] {
+    flex: 1; height: 3px; -webkit-appearance: none; appearance: none;
+    background: #2a2420; border-radius: 2px; outline: none;
+  }
+  .ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    background: #c8b8a4; border-radius: 50%; cursor: pointer;
+  }
+  .ctrl .val {
+    flex: 0 0 36px; text-align: right; font-size: 10px;
+    color: #6a5e52; font-variant-numeric: tabular-nums;
+  }
 
-        /* Multi images (2 or 3 stacked on one A4 page) */
-        .a4.multi {
-            gap: 0.842%; /* 2.5mm */
-        }
-        .a4.multi .img-slot {
-            flex: 1;
-            min-height: 0;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        .a4.multi .img-slot img {
-            max-width: 100%;
-            max-height: 100%;
-            display: block;
-            object-fit: contain;
-        }
+  .toggle { display: flex; align-items: center; gap: 8px; margin: 0.35rem 0; }
+  .toggle label { flex: 1; font-size: 10px; color: #8a7a6a; cursor: pointer; }
+  .toggle input { display: none; }
+  .toggle .sw {
+    width: 28px; height: 14px; background: #2a2420;
+    border-radius: 7px; position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle .sw::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 10px; height: 10px; background: #5a5048;
+    border-radius: 50%; transition: all 0.2s;
+  }
+  .toggle input:checked + .sw { background: #4a6a4a; }
+  .toggle input:checked + .sw::after { left: 16px; background: #8ac88a; }
 
-        .layout-select {
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            z-index: 6;
-            font-size: 0.65rem;
-            padding: 2px 4px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 3px;
-            background: rgba(0,0,0,0.6);
-            color: white;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.15s;
-        }
-        .a4:hover .layout-select { opacity: 1; }
+  /* Curve editor */
+  #curveWrap {
+    margin: 0.6rem 0; position: relative;
+    background: #1a1714; border-radius: 4px; overflow: hidden;
+  }
+  #curveCanvas { display: block; cursor: crosshair; width: 100%; height: 180px; }
 
-        /* Overlay & controls */
-        .overlay {
-            position: absolute;
-            top: 3px;
-            right: 3px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            opacity: 0;
-            transition: opacity 0.15s;
-            z-index: 5;
-        }
-        .a4:hover .overlay,
-        .img-slot:hover .overlay { opacity: 1; }
+  .hint {
+    text-align: center; font-size: 9px; color: #4a4038;
+    margin-top: 0.5rem; letter-spacing: 0.1em;
+  }
 
-        .id-tag {
-            position: absolute;
-            bottom: 3px;
-            left: 4px;
-            background: rgba(0,0,0,0.55);
-            color: #fff;
-            font-size: 0.65rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            pointer-events: none;
-            z-index: 5;
-        }
+  .panel-btns {
+    display: flex; gap: 8px; margin-top: 1rem; padding-top: 0.8rem;
+    border-top: 1px solid #2a2420;
+  }
+  .panel-btns button {
+    flex: 1; padding: 6px 0; border: none; border-radius: 4px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 10px; letter-spacing: 0.1em; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  #btnSave { background: #4a6a4a; color: #c8e8c8; }
+  #btnSave:hover { background: #5a8a5a; }
+  #btnSave.saved { background: #3a5a3a; color: #8ac88a; }
+  #btnReset { background: #2a2420; color: #8a7a6a; }
+  #btnReset:hover { background: #3a3028; color: #c8b8a4; }
 
-        .page select, .a4 select {
-            font-size: 0.65rem;
-            padding: 2px 4px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 3px;
-            background: rgba(0,0,0,0.6);
-            color: white;
-            cursor: pointer;
-        }
-        .swap-input {
-            width: 38px;
-            font-size: 0.6rem;
-            padding: 2px 3px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 3px;
-            background: rgba(0,0,0,0.6);
-            color: white;
-            text-align: center;
-        }
-        .swap-input::placeholder { color: rgba(255,255,255,0.5); }
-        .swap-btn {
-            font-size: 0.6rem;
-            padding: 2px 5px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 3px;
-            background: rgba(0,0,0,0.6);
-            color: white;
-            cursor: pointer;
-        }
-        .swap-btn:hover { background: rgba(80,50,20,0.8); }
-        .remove-btn {
-            font-size: 0.55rem;
-            padding: 2px 5px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 3px;
-            background: rgba(180,50,50,0.7);
-            color: white;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .remove-btn:hover { background: rgba(200,30,30,0.9); }
+  /* Progress preview bar */
+  #progBar {
+    margin: 0.8rem 0 0.3rem;
+    height: 4px; background: #1a1714; border-radius: 2px; overflow: hidden;
+  }
+  #progFill { height: 100%; background: #c8b8a4; width: 0%; transition: width 0.05s; }
 
-        .spread-label {
-            text-align: center;
-            color: #aaa;
-            font-size: 0.7rem;
-            margin: -1rem auto 1.5rem;
-            max-width: 960px;
-        }
-
-        @media print {
-            body { padding: 0; background: white; }
-            h1, .subtitle, .save-bar, .spread-label, .overlay, .undo-bar, .swap-bar, .layout-select { display: none !important; }
-            .cover-wrap, .spread { box-shadow: none; max-width: 100%; }
-            .a4 { box-shadow: none; break-after: page; height: 100vh; }
-            .spread { break-after: avoid; }
-        }
-        @media (max-width: 600px) {
-            body { padding: 0.5rem; }
-            h1 { font-size: 1.4rem; }
-            .spread { flex-direction: column; }
-        }
-    </style>
+  /* Toggle button hint */
+  #panelHint {
+    position: fixed; top: 1rem; right: 1rem;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 10px; color: #3a342e; letter-spacing: 0.1em;
+    z-index: 100; pointer-events: none;
+    transition: opacity 0.5s;
+  }
+</style>
 </head>
 <body>
 
-<h1>Lillin Akvarellit</h1>
-<p class="subtitle" id="subtitle"></p>
-<div class="save-bar">
-    <button onclick="saveToFile()">Tallenna asetukset</button>
-    <span class="status" id="save-status"></span>
+<div id="loader"><p>LADATAAN</p></div>
+<canvas id="c"></canvas>
+<div id="title">
+  <h1>Lillin Akvarellit</h1>
+  <p class="sub">scrollaa sukeltaaksesi</p>
 </div>
-<div class="swap-bar">
-    <label>Vaihda:</label>
-    <input type="text" id="swap-a" placeholder="AKV-nro">
-    <span>&#8644;</span>
-    <input type="text" id="swap-b" placeholder="AKV-nro">
-    <button onclick="doGlobalSwap()">Vaihda</button>
-    <span class="swap-status" id="swap-status"></span>
-</div>
-<div class="undo-bar" id="undo-bar">
-    <span id="undo-text"></span>
-    <button onclick="undoRemove()">Kumoa</button>
-</div>
-<div id="book"></div>
+<div id="counter"></div>
+<div id="panelHint">[ S ] asetukset</div>
 
+<!-- ===== SETTINGS PANEL ===== -->
+<div id="panel">
+  <h2>Scrollaus</h2>
+  <div id="progBar"><div id="progFill"></div></div>
+  <div class="ctrl"><label>Scroll-nopeus</label><input type="range" id="sSpeed" min="0.0002" max="0.005" step="0.0001" value="0.001"><span class="val"></span></div>
+  <div class="ctrl"><label>Lerp (smooth)</label><input type="range" id="sLerp" min="0.01" max="0.25" step="0.005" value="0.06"><span class="val"></span></div>
+
+  <h2>Transitio</h2>
+  <div class="ctrl" style="margin-bottom:0.6rem">
+    <label>Tyyli</label>
+    <select id="sTransMode" style="flex:1;background:#1a1714;color:#c8b8a4;border:1px solid #2a2420;border-radius:3px;padding:3px 6px;font-size:10px;font-family:-apple-system,system-ui,sans-serif;cursor:pointer;">
+      <option value="0">Radiaalinen</option>
+      <option value="1">Akvarelli-bleed</option>
+    </select>
+  </div>
+  <div class="ctrl"><label>Reuna-feather</label><input type="range" id="sFeather" min="0.01" max="0.3" step="0.005" value="0.06"><span class="val"></span></div>
+  <div class="ctrl"><label>Next-aloituskoko</label><input type="range" id="sNextScale" min="0.01" max="0.5" step="0.01" value="0.08"><span class="val"></span></div>
+
+  <div id="radialControls">
+    <div class="ctrl"><label>Noise-skaala</label><input type="range" id="sNoiseScale" min="0.5" max="12" step="0.1" value="3.5"><span class="val"></span></div>
+    <div class="ctrl"><label>Noise-nopeus</label><input type="range" id="sNoiseSpeed" min="0" max="0.4" step="0.005" value="0.3"><span class="val"></span></div>
+    <div class="ctrl"><label>Noise-määrä</label><input type="range" id="sNoiseAmp" min="0" max="0.4" step="0.005" value="0.1"><span class="val"></span></div>
+    <div class="ctrl"><label>Radius-kerroin</label><input type="range" id="sRadius" min="0.8" max="2.0" step="0.05" value="1.3"><span class="val"></span></div>
+  </div>
+
+  <div id="watercolorControls" style="display:none">
+    <div class="ctrl"><label>Warp-skaala</label><input type="range" id="sWarpScale" min="1" max="8" step="0.1" value="3"><span class="val"></span></div>
+    <div class="ctrl"><label>Warp-voimakkuus</label><input type="range" id="sWarpIntensity" min="0.05" max="0.8" step="0.01" value="0.3"><span class="val"></span></div>
+    <div class="ctrl"><label>Warp-nopeus</label><input type="range" id="sWarpSpeed" min="0" max="0.5" step="0.005" value="0.12"><span class="val"></span></div>
+    <div class="ctrl"><label>Värivuoto</label><input type="range" id="sBleed" min="0" max="0.05" step="0.001" value="0.015"><span class="val"></span></div>
+  </div>
+
+  <h2>Zoom & liike</h2>
+  <div class="ctrl"><label>Zoom-teho</label><input type="range" id="sZoomPow" min="1.5" max="40" step="0.5" value="7"><span class="val"></span></div>
+  <div class="ctrl"><label>Barrel</label><input type="range" id="sBarrel" min="0" max="1.0" step="0.01" value="0.15"><span class="val"></span></div>
+  <div class="ctrl"><label>Parallaksi</label><input type="range" id="sParallax" min="0" max="0.06" step="0.002" value="0.015"><span class="val"></span></div>
+  <div class="ctrl"><label>Zoom mouse</label><input type="range" id="sZoomMouse" min="0" max="0.4" step="0.005" value="0.06"><span class="val"></span></div>
+
+  <h2>Post-efektit</h2>
+  <div class="toggle"><label>Kromaattinen aberraatio</label><input type="checkbox" id="tAber" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
+  <div class="ctrl"><label>Aber. määrä</label><input type="range" id="sAber" min="0" max="0.06" step="0.001" value="0.015"><span class="val"></span></div>
+
+  <div class="toggle"><label>Vinjetti</label><input type="checkbox" id="tVig" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
+  <div class="ctrl"><label>Vig. tummuus</label><input type="range" id="sVig" min="0" max="1" step="0.02" value="0.55"><span class="val"></span></div>
+
+  <div class="toggle"><label>Filmirae</label><input type="checkbox" id="tGrain" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
+  <div class="ctrl"><label>Rae-määrä</label><input type="range" id="sGrain" min="0" max="0.08" step="0.002" value="0.025"><span class="val"></span></div>
+
+  <div class="toggle"><label>Mouse glow</label><input type="checkbox" id="tGlow" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
+  <div class="ctrl"><label>Glow-määrä</label><input type="range" id="sGlow" min="0" max="1" step="0.02" value="0.25"><span class="val"></span></div>
+
+  <div class="toggle"><label>Värigreidaus</label><input type="checkbox" id="tColor" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
+
+  <h2>Transition Curve</h2>
+  <div id="curveWrap"><canvas id="curveCanvas"></canvas></div>
+  <p class="hint">Vedä pisteitä muokataksesi easingia</p>
+  <button id="btnResetCurve" style="width:100%;margin-top:0.4rem;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">RESET CURVE</button>
+
+  <div class="panel-btns">
+    <button id="btnSave">TALLENNA</button>
+    <button id="btnReset">PALAUTA OLETUS</button>
+  </div>
+</div>
+
+<!-- =================== SHADERS =================== -->
+<script id="vs" type="x-shader/x-vertex">
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}
+</script>
+
+<script id="fs" type="x-shader/x-fragment">
+precision highp float;
+
+varying vec2 vUv;
+
+uniform sampler2D uCurrent;
+uniform sampler2D uNext;
+uniform float uProgress;
+uniform vec2 uMouse;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform vec2 uCurrentSize;
+uniform vec2 uNextSize;
+
+// Tweakable uniforms
+uniform float uNoiseScale;
+uniform float uNoiseSpeed;
+uniform float uNoiseAmp;
+uniform float uFeather;
+uniform float uRadiusMult;
+uniform float uNextStartScale;
+uniform float uZoomPow;
+uniform float uBarrelAmt;
+uniform float uParallaxAmt;
+uniform float uZoomMouse;
+uniform float uAberAmt;     // 0 = off
+uniform float uVigDark;     // 0 = off (value = darkest edge)
+uniform float uGrainAmt;    // 0 = off
+uniform float uGlowAmt;     // 0 = off
+uniform float uColorGrade;  // 0 = off, 1 = on
+
+// Watercolor transition
+uniform float uTransitionMode; // 0 = radial, 1 = watercolor
+uniform float uWarpScale;
+uniform float uWarpIntensity;
+uniform float uWarpSpeed;
+uniform float uBleedAmt;
+
+// ---- Simplex noise ----
+vec3 mod289(vec3 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
+vec2 mod289(vec2 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
+vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+float snoise(vec2 v) {
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                     -0.577350269189626, 0.024390243902439);
+  vec2 i = floor(v + dot(v, C.yy));
+  vec2 x0 = v - i + dot(i, C.xx);
+  vec2 i1 = (x0.x > x0.y) ? vec2(1.0,0.0) : vec2(0.0,1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod289(i);
+  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+  m = m*m; m = m*m;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 a0 = x - floor(x + 0.5);
+  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+  vec3 g;
+  g.x = a0.x * x0.x + h.x * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+vec2 coverUv(vec2 uv, vec2 imgSize, vec2 screenSize) {
+  uv.y = 1.0 - uv.y;
+  float imgAspect = imgSize.x / imgSize.y;
+  float screenAspect = screenSize.x / screenSize.y;
+  vec2 scale = vec2(1.0);
+  if (imgAspect > screenAspect) { scale.x = screenAspect / imgAspect; }
+  else { scale.y = imgAspect / screenAspect; }
+  return (uv - 0.5) * scale + 0.5;
+}
+
+vec2 barrel(vec2 uv, float amt) {
+  vec2 cc = uv - 0.5;
+  return uv + cc * dot(cc,cc) * amt;
+}
+
+void main() {
+  vec2 uv = vUv;
+  float p = clamp(uProgress, 0.0, 1.0);
+  vec2 mOff = (uMouse - 0.5);
+  vec2 parallax = mOff * uParallaxAmt;
+
+  // ---- Current image: barrel + zoom ----
+  float bAmt = -uBarrelAmt * p;
+  vec2 curDistUv = barrel(uv, bAmt);
+  float zoomFactor = pow(uZoomPow, p);
+  vec2 zoomCenter = vec2(0.5) + mOff * uZoomMouse * p;
+  vec2 currentUv = (curDistUv - zoomCenter) / zoomFactor + zoomCenter;
+  currentUv += parallax * (1.0 - p);
+
+  // ---- Next image: clean ----
+  float nextScale = uNextStartScale + p * (1.0 - uNextStartScale);
+  vec2 nextUv = (uv - 0.5) / nextScale + 0.5;
+  nextUv += parallax * p;
+
+  vec2 cUv = coverUv(currentUv, uCurrentSize, uResolution);
+  vec2 nUv = coverUv(nextUv, uNextSize, uResolution);
+
+  // ---- Boundary ----
+  vec2 fromCenter = uv - 0.5;
+  float dist = length(fromCenter);
+  float boundary;
+
+  if (uTransitionMode < 0.5) {
+    // === Radial noise mode (original) ===
+    float n = snoise(fromCenter * uNoiseScale + uTime * uNoiseSpeed) * uNoiseAmp;
+    n += snoise(fromCenter * uNoiseScale * 2.5 - uTime * uNoiseSpeed * 0.7) * uNoiseAmp * 0.5;
+    float radius = p * uRadiusMult;
+    float feath = uFeather + p * uFeather;
+    boundary = smoothstep(radius - feath, radius + feath, dist + n);
+  } else {
+    // === Watercolor bleed mode ===
+    // Domain warping: noise(pos + noise(pos + noise(pos)))
+    float t = uTime * uWarpSpeed;
+    vec2 q = vec2(
+      snoise(fromCenter * uWarpScale + vec2(0.0, t * 0.3)),
+      snoise(fromCenter * uWarpScale + vec2(5.2, t * 0.2 + 1.3))
+    );
+    vec2 r = vec2(
+      snoise((fromCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(1.7 - t * 0.15, 9.2)),
+      snoise((fromCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(8.3, 2.8 + t * 0.12))
+    );
+    // Third octave for fine tendrils
+    vec2 s = vec2(
+      snoise((fromCenter + uWarpIntensity * r) * uWarpScale * 2.8 + vec2(3.1, t * 0.08)),
+      snoise((fromCenter + uWarpIntensity * r) * uWarpScale * 2.8 + vec2(7.7, 4.2 - t * 0.1))
+    );
+
+    // Composite warped field: blend distance with warped noise
+    float warpField = snoise(fromCenter * uWarpScale + uWarpIntensity * (q + r * 0.6 + s * 0.3));
+    // Normalize roughly to 0..1
+    warpField = warpField * 0.5 + 0.5;
+    // Blend with radial distance so transition has directionality (center → out)
+    float radialBias = dist * 1.4;
+    warpField = mix(warpField, radialBias, 0.35);
+
+    // Threshold based on progress
+    float feath = uFeather + p * uFeather * 0.5;
+    boundary = smoothstep(p - feath, p + feath, warpField);
+
+    // Color bleed at boundary edges: shift the sampling slightly
+    float bleedMask = smoothstep(p - feath * 2.0, p, warpField) - smoothstep(p, p + feath * 2.0, warpField);
+    bleedMask = max(bleedMask, 0.0);
+    vec2 bleedOffset = vec2(q.x, q.y) * uBleedAmt * bleedMask;
+    currentUv += bleedOffset;
+    nextUv -= bleedOffset * 0.5;
+    // Recompute cover UVs with bleed
+    cUv = coverUv(currentUv, uCurrentSize, uResolution);
+    nUv = coverUv(nextUv, uNextSize, uResolution);
+  }
+
+  // ---- Sample current ----
+  float aberration = uAberAmt * p * (1.0 - p);
+  vec2 aberDir = normalize(fromCenter + 0.001);
+
+  vec3 curCol;
+  if (cUv.x < 0.0 || cUv.x > 1.0 || cUv.y < 0.0 || cUv.y > 1.0) {
+    curCol = vec3(0.04, 0.035, 0.03);
+  } else if (aberration > 0.0005) {
+    curCol.r = texture2D(uCurrent, cUv + aberDir * aberration).r;
+    curCol.g = texture2D(uCurrent, cUv).g;
+    curCol.b = texture2D(uCurrent, cUv - aberDir * aberration).b;
+  } else {
+    curCol = texture2D(uCurrent, cUv).rgb;
+  }
+
+  // ---- Sample next (CLAMP_TO_EDGE extends edge pixels instead of black) ----
+  vec3 nxtCol = texture2D(uNext, clamp(nUv, 0.0, 1.0)).rgb;
+
+  // ---- Constrain boundary to next image coverage ----
+  // Don't reveal next image where it hasn't scaled up yet
+  float edgeDist = min(min(nUv.x, 1.0 - nUv.x), min(nUv.y, 1.0 - nUv.y));
+  float nextCoverage = smoothstep(-0.03, 0.05, edgeDist);
+  nextCoverage = max(nextCoverage, smoothstep(0.92, 0.99, p));
+  float maskedBoundary = mix(1.0, boundary, nextCoverage);
+
+  // ---- Mix ----
+  vec3 col = mix(nxtCol, curCol, maskedBoundary);
+
+  // ---- Mouse glow ----
+  if (uGlowAmt > 0.0) {
+    float md = length(uv - uMouse);
+    col += exp(-md * md * 12.0) * p * (1.0 - p) * uGlowAmt;
+  }
+
+  // ---- Vignette ----
+  if (uVigDark > 0.0) {
+    float vig = 1.0 - dot(fromCenter * 1.1, fromCenter * 1.1);
+    vig = smoothstep(0.0, 0.7, vig);
+    col *= mix(1.0 - uVigDark, 1.0, vig);
+  }
+
+  // ---- Grain ----
+  if (uGrainAmt > 0.0) {
+    float grain = (snoise(uv * 500.0 + uTime * 10.0) * 0.5 + 0.5) * uGrainAmt;
+    col += grain - uGrainAmt * 0.5;
+  }
+
+  // ---- Color grade ----
+  if (uColorGrade > 0.5) {
+    col = pow(col, vec3(0.95, 0.98, 1.02));
+  }
+
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+
+<!-- =================== MAIN JS =================== -->
 <script>
-const catalog = [
-{"id":"AKV-001","f":"IMG_0278.jpeg","w":2231,"h":3082},
-{"id":"AKV-002","f":"IMG_0317.jpeg","w":2416,"h":2461},
-{"id":"AKV-003","f":"IMG_0398.jpeg","w":2424,"h":3298},
-{"id":"AKV-004","f":"IMG_0426.jpeg","w":2312,"h":2750},
-{"id":"AKV-005","f":"IMG_0446.jpeg","w":2141,"h":2894},
-{"id":"AKV-006","f":"IMG_0461.jpeg","w":1982,"h":2168},
-{"id":"AKV-007","f":"IMG_0552.jpeg","w":1626,"h":2029},
-{"id":"AKV-008","f":"IMG_0765.jpeg","w":3346,"h":2622},
-{"id":"AKV-009","f":"IMG_0827.jpeg","w":1600,"h":2247},
-{"id":"AKV-010","f":"IMG_0831.jpeg","w":1595,"h":2485},
-{"id":"AKV-011","f":"IMG_0842.jpeg","w":1311,"h":1513},
-{"id":"AKV-012","f":"IMG_0845.jpeg","w":1545,"h":2272},
-{"id":"AKV-013","f":"IMG_0855.jpeg","w":1994,"h":2528},
-{"id":"AKV-014","f":"IMG_0945.jpeg","w":2478,"h":3339},
-{"id":"AKV-015","f":"IMG_0953.jpeg","w":3024,"h":3284},
-{"id":"AKV-016","f":"IMG_1007.jpeg","w":2333,"h":3128},
-{"id":"AKV-017","f":"IMG_1014.jpeg","w":1773,"h":2375},
-{"id":"AKV-018","f":"IMG_1017.jpeg","w":1402,"h":1796},
-{"id":"AKV-019","f":"IMG_1035.jpeg","w":2130,"h":1578},
-{"id":"AKV-020","f":"IMG_1072.jpeg","w":2895,"h":3642},
-{"id":"AKV-021","f":"IMG_1092.jpeg","w":2659,"h":3463},
-{"id":"AKV-022","f":"IMG_1108.jpeg","w":2247,"h":3017},
-{"id":"AKV-023","f":"IMG_1111.jpeg","w":2244,"h":3201},
-{"id":"AKV-024","f":"IMG_1123.jpeg","w":1565,"h":2949},
-{"id":"AKV-025","f":"IMG_1136.jpeg","w":2305,"h":3111},
-{"id":"AKV-026","f":"IMG_1158.jpeg","w":1816,"h":1458},
-{"id":"AKV-027","f":"IMG_1165.jpeg","w":750,"h":632},
-{"id":"AKV-028","f":"IMG_1169.jpeg","w":2256,"h":3168},
-{"id":"AKV-029","f":"IMG_1175.jpeg","w":2078,"h":2851},
-{"id":"AKV-030","f":"IMG_1183.jpeg","w":2427,"h":3195},
-{"id":"AKV-031","f":"IMG_1269.jpeg","w":2217,"h":2659},
-{"id":"AKV-032","f":"IMG_1281.jpeg","w":750,"h":988},
-{"id":"AKV-033","f":"IMG_1289.jpeg","w":2432,"h":3271},
-{"id":"AKV-034","f":"IMG_1314.jpeg","w":2236,"h":3134},
-{"id":"AKV-035","f":"IMG_1325.jpeg","w":3708,"h":2481},
-{"id":"AKV-036","f":"IMG_1326.jpeg","w":3372,"h":2147},
-{"id":"AKV-037","f":"IMG_1327.jpeg","w":1601,"h":2321},
-{"id":"AKV-038","f":"IMG_1328.jpeg","w":3200,"h":2204},
-{"id":"AKV-039","f":"IMG_1329.jpeg","w":3669,"h":2630},
-{"id":"AKV-040","f":"IMG_1340.jpeg","w":2316,"h":3174},
-{"id":"AKV-041","f":"IMG_1343.jpeg","w":2338,"h":1821},
-{"id":"AKV-042","f":"IMG_1355.jpeg","w":4032,"h":3024},
-{"id":"AKV-043","f":"IMG_1356.jpeg","w":2596,"h":3017},
-{"id":"AKV-044","f":"IMG_1359.jpeg","w":2657,"h":3581},
-{"id":"AKV-045","f":"IMG_1388.jpeg","w":1682,"h":1131},
-{"id":"AKV-046","f":"IMG_1391.jpeg","w":4032,"h":3024},
-{"id":"AKV-047","f":"IMG_1396.jpeg","w":2695,"h":2600},
-{"id":"AKV-048","f":"IMG_1397.jpeg","w":2772,"h":3471},
-{"id":"AKV-049","f":"IMG_1398.jpeg","w":2163,"h":2709},
-{"id":"AKV-050","f":"IMG_1400.jpeg","w":1929,"h":2759},
-{"id":"AKV-051","f":"IMG_1421.jpeg","w":2842,"h":1997},
-{"id":"AKV-052","f":"IMG_1430.JPG","w":2268,"h":2070},
-{"id":"AKV-053","f":"IMG_1450.jpeg","w":3228,"h":2248},
-{"id":"AKV-054","f":"IMG_1498.jpeg","w":2214,"h":2964},
-{"id":"AKV-055","f":"IMG_1513.jpeg","w":639,"h":957},
-{"id":"AKV-056","f":"IMG_1526.jpeg","w":3177,"h":2040},
-{"id":"AKV-057","f":"IMG_1585.JPG","w":3197,"h":2397},
-{"id":"AKV-058","f":"IMG_1586.JPG","w":2961,"h":2234},
-{"id":"AKV-059","f":"IMG_1599.jpeg","w":3289,"h":2116},
-{"id":"AKV-060","f":"IMG_1638.jpeg","w":2694,"h":3324},
-{"id":"AKV-061","f":"IMG_1662.jpeg","w":2872,"h":1941},
-{"id":"AKV-062","f":"IMG_2236.jpeg","w":2698,"h":3521},
-{"id":"AKV-063","f":"IMG_2237.jpeg","w":2879,"h":3568},
-{"id":"AKV-064","f":"IMG_2252.jpeg","w":2456,"h":3128},
-{"id":"AKV-065","f":"IMG_2262.JPG","w":2126,"h":2277},
-{"id":"AKV-066","f":"IMG_2264.JPG","w":2093,"h":3020},
-{"id":"AKV-067","f":"IMG_2345.JPG","w":2874,"h":1910},
-{"id":"AKV-068","f":"IMG_2409.jpeg","w":3175,"h":2200},
-{"id":"AKV-069","f":"IMG_2543.jpeg","w":4032,"h":3024},
-{"id":"AKV-070","f":"IMG_2545.jpeg","w":2596,"h":3601},
-{"id":"AKV-071","f":"IMG_2548.jpeg","w":2974,"h":2645},
-{"id":"AKV-072","f":"IMG_2549.jpeg","w":2807,"h":3789},
-{"id":"AKV-073","f":"IMG_2550.jpeg","w":4032,"h":3024},
-{"id":"AKV-074","f":"IMG_2555.jpeg","w":2881,"h":2784},
-{"id":"AKV-075","f":"IMG_2576.jpeg","w":2597,"h":3524},
-{"id":"AKV-076","f":"IMG_2615.jpeg","w":2807,"h":2079},
-{"id":"AKV-077","f":"IMG_2628.JPG","w":2160,"h":2872},
-{"id":"AKV-078","f":"IMG_2682.jpeg","w":2448,"h":3040},
-{"id":"AKV-079","f":"IMG_2688.jpeg","w":3023,"h":3873},
-{"id":"AKV-080","f":"IMG_2689.jpeg","w":3024,"h":4032},
-{"id":"AKV-081","f":"IMG_2691.jpeg","w":4032,"h":3024},
-{"id":"AKV-082","f":"IMG_2692.jpeg","w":2574,"h":2077},
-{"id":"AKV-083","f":"IMG_2740.jpeg","w":2314,"h":3358},
-{"id":"AKV-084","f":"IMG_2770.jpeg","w":2378,"h":3205},
-{"id":"AKV-085","f":"IMG_2771.jpeg","w":2574,"h":3078},
-{"id":"AKV-086","f":"IMG_2772.jpeg","w":4032,"h":3024},
-{"id":"AKV-087","f":"IMG_2781.jpeg","w":1819,"h":2315},
-{"id":"AKV-088","f":"IMG_2785.jpeg","w":1614,"h":2053},
-{"id":"AKV-089","f":"IMG_2804.jpeg","w":2242,"h":3355},
-{"id":"AKV-090","f":"IMG_2836.jpeg","w":2111,"h":3369},
-{"id":"AKV-091","f":"IMG_2838.jpeg","w":2850,"h":2080},
-{"id":"AKV-092","f":"IMG_2880.jpeg","w":2186,"h":1517},
-{"id":"AKV-093","f":"IMG_2881.jpeg","w":2310,"h":1627},
-{"id":"AKV-094","f":"IMG_2914.jpeg","w":1883,"h":2707},
-{"id":"AKV-095","f":"IMG_3086.JPG","w":1982,"h":2669},
-{"id":"AKV-096","f":"IMG_3469.JPG","w":2640,"h":1729},
-{"id":"AKV-097","f":"IMG_3656.JPG","w":2072,"h":3082},
-{"id":"AKV-098","f":"IMG_3657.JPG","w":2486,"h":1844},
-{"id":"AKV-099","f":"IMG_3668.JPG","w":3264,"h":2448},
-{"id":"AKV-100","f":"IMG_3701.JPG","w":2109,"h":1663},
-{"id":"AKV-101","f":"IMG_3702.JPG","w":2563,"h":1870},
-{"id":"AKV-102","f":"IMG_3704.JPG","w":2788,"h":1909},
-{"id":"AKV-103","f":"IMG_3713.JPG","w":2033,"h":2578},
-{"id":"AKV-104","f":"IMG_3715.JPG","w":1930,"h":2629},
-{"id":"AKV-105","f":"IMG_3739.jpeg","w":1850,"h":2861},
-{"id":"AKV-106","f":"IMG_3748.JPG","w":3264,"h":2448},
-{"id":"AKV-107","f":"IMG_3749.JPG","w":3264,"h":2448},
-{"id":"AKV-108","f":"IMG_3772.JPG","w":2859,"h":2128},
-{"id":"AKV-109","f":"IMG_3782.JPG","w":2016,"h":2968},
-{"id":"AKV-110","f":"IMG_3860.JPG","w":2083,"h":2668},
-{"id":"AKV-111","f":"IMG_3913.jpeg","w":2780,"h":1891},
-{"id":"AKV-112","f":"IMG_4018.jpeg","w":2957,"h":3858},
-{"id":"AKV-113","f":"IMG_4108.jpeg","w":2127,"h":3273},
-{"id":"AKV-114","f":"IMG_4151.jpeg","w":2799,"h":3694},
-{"id":"AKV-115","f":"IMG_4154.jpeg","w":2730,"h":2032},
-{"id":"AKV-116","f":"IMG_4155.jpeg","w":2926,"h":2211},
-{"id":"AKV-117","f":"IMG_4159.JPG","w":2699,"h":2006},
-{"id":"AKV-118","f":"IMG_4163.JPG","w":1965,"h":2656},
-{"id":"AKV-119","f":"IMG_4345.JPG","w":2285,"h":2733},
-{"id":"AKV-120","f":"IMG_4404.JPG","w":1733,"h":2350},
-{"id":"AKV-121","f":"IMG_4408.JPG","w":3264,"h":2448},
-{"id":"AKV-122","f":"IMG_4409.JPG","w":3264,"h":2448},
-{"id":"AKV-123","f":"IMG_4414.JPG","w":2268,"h":2929},
-{"id":"AKV-124","f":"IMG_4439.JPG","w":3264,"h":2448},
-{"id":"AKV-125","f":"IMG_4448.JPG","w":2039,"h":2773},
-{"id":"AKV-126","f":"IMG_4453.JPG","w":2456,"h":1883},
-{"id":"AKV-127","f":"IMG_4520.jpeg","w":3582,"h":2523},
-{"id":"AKV-128","f":"IMG_4717.jpeg","w":1988,"h":2745},
-{"id":"AKV-129","f":"IMG_4735.jpeg","w":2399,"h":3429},
-{"id":"AKV-130","f":"IMG_4748.jpeg","w":2477,"h":3211},
-{"id":"AKV-131","f":"IMG_4799.jpeg","w":2679,"h":3442},
-{"id":"AKV-132","f":"IMG_4802.jpeg","w":2318,"h":4029},
-{"id":"AKV-133","f":"IMG_4804.jpeg","w":2975,"h":4032},
-{"id":"AKV-134","f":"IMG_4807.jpeg","w":935,"h":968},
-{"id":"AKV-135","f":"IMG_4869.JPG","w":2865,"h":2331},
-{"id":"AKV-136","f":"IMG_4914.jpeg","w":2668,"h":2694},
-{"id":"AKV-137","f":"IMG_4916.jpeg","w":2562,"h":3296},
-{"id":"AKV-138","f":"IMG_4950.jpeg","w":3383,"h":2318},
-{"id":"AKV-139","f":"IMG_4988.JPG","w":1872,"h":2434},
-{"id":"AKV-140","f":"IMG_5723.JPG","w":3264,"h":2448},
-{"id":"AKV-141","f":"IMG_6210.jpeg","w":1964,"h":2739},
-{"id":"AKV-142","f":"IMG_6222.jpeg","w":4032,"h":3024},
-{"id":"AKV-143","f":"IMG_6296.jpeg","w":2011,"h":2830},
-{"id":"AKV-144","f":"IMG_6314.jpeg","w":2153,"h":2906},
-{"id":"AKV-145","f":"IMG_6349.jpeg","w":2133,"h":1745},
-{"id":"AKV-146","f":"IMG_6350.jpeg","w":2005,"h":2070},
-{"id":"AKV-147","f":"IMG_6354.jpeg","w":1914,"h":2227},
-{"id":"AKV-148","f":"IMG_6642.jpeg","w":1495,"h":947},
-{"id":"AKV-149","f":"IMG_6701.jpeg","w":2783,"h":2823},
-{"id":"AKV-150","f":"IMG_7015.jpeg","w":2537,"h":3623},
-{"id":"AKV-151","f":"IMG_7386.jpeg","w":2070,"h":2977},
-{"id":"AKV-152","f":"IMG_7433.jpeg","w":2212,"h":3084},
-{"id":"AKV-153","f":"IMG_7508.jpeg","w":2026,"h":2992},
-{"id":"AKV-154","f":"IMG_7536.jpeg","w":2390,"h":3483},
-{"id":"AKV-155","f":"IMG_7538.jpeg","w":2292,"h":3124},
-{"id":"AKV-156","f":"IMG_7608.jpeg","w":1687,"h":2432},
-{"id":"AKV-157","f":"IMG_8040.jpeg","w":1700,"h":2667},
-{"id":"AKV-158","f":"IMG_8068.jpeg","w":2304,"h":3323},
-{"id":"AKV-159","f":"IMG_8069.jpeg","w":2155,"h":3139},
-{"id":"AKV-160","f":"IMG_8075.jpeg","w":2163,"h":3066},
-{"id":"AKV-161","f":"IMG_8247.jpeg","w":2472,"h":3559},
-{"id":"AKV-162","f":"IMG_8249.jpeg","w":2415,"h":3437},
-{"id":"AKV-163","f":"IMG_8250.jpeg","w":2665,"h":2809},
-{"id":"AKV-164","f":"IMG_8251.jpeg","w":3355,"h":2376},
-{"id":"AKV-165","f":"IMG_8361.jpeg","w":2439,"h":3725},
-{"id":"AKV-166","f":"IMG_8364.jpeg","w":2204,"h":3146},
-{"id":"AKV-167","f":"IMG_8366.jpeg","w":2302,"h":3372}
-];
+// ===== SETTINGS OBJECT =====
+const DEFAULTS = {
+  speed: 0.001, lerp: 0.06, noiseScale: 3.5, noiseSpeed: 0.3,
+  noiseAmp: 0.1, feather: 0.06, radius: 1.3, nextScale: 0.08,
+  transMode: 0,
+  warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
+  zoomPow: 7, barrel: 0.15, parallax: 0.015, zoomMouse: 0.06,
+  aber: 0.015, aberOn: true, vig: 0.55, vigOn: true,
+  grain: 0.025, grainOn: true, glow: 0.25, glowOn: true, colorOn: true,
+};
+const CURVE_DEFAULTS = {
+  x1: 0.2, y1: 0.0,       // handle for start (0,0)
+  mx: 0.5, my: 0.5,        // mid point (on curve)
+  mhx: 0.35, mhy: 0.5,     // mid handle (left side; right side is mirrored)
+  x2: 0.8, y2: 1.0,        // handle for end (1,1)
+};
 
-/* --- REMOVED IMAGES --- */
-const REMOVED_KEY = 'akvarellit_removed';
-let removedStack = []; // stack for undo
+const STORAGE_KEY = 'lillinAkvarellit_settings';
 
-function loadRemoved() {
-    try {
-        const raw = localStorage.getItem(REMOVED_KEY);
-        if (raw) return new Set(JSON.parse(raw));
-    } catch {}
-    return new Set();
+function loadSavedSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
 }
 
-function saveRemoved(removedSet) {
-    localStorage.setItem(REMOVED_KEY, JSON.stringify([...removedSet]));
+const saved = loadSavedSettings();
+const S = { ...DEFAULTS, ...(saved?.settings || {}) };
+
+// ===== CURVE EDITOR =====
+// Two-segment cubic bezier through a draggable mid point
+// Seg1: (0,0) → (x1,y1) → (mhx,mhy) → (mx,my)
+// Seg2: (mx,my) → (mirror of mh) → (x2,y2) → (1,1)
+const curve = { ...CURVE_DEFAULTS, ...(saved?.curve || {}) };
+
+function cubicB(t, p0, p1, p2, p3) {
+  const mt = 1 - t;
+  return mt*mt*mt*p0 + 3*mt*mt*t*p1 + 3*mt*t*t*p2 + t*t*t*p3;
+}
+function cubicBd(t, p0, p1, p2, p3) {
+  const mt = 1 - t;
+  return 3*mt*mt*(p1-p0) + 6*mt*t*(p2-p1) + 3*t*t*(p3-p2);
+}
+function solveT(x, xp0, xp1, xp2, xp3) {
+  let t = 0.5;
+  for (let i = 0; i < 12; i++) {
+    const xAt = cubicB(t, xp0, xp1, xp2, xp3);
+    const dx = cubicBd(t, xp0, xp1, xp2, xp3);
+    if (Math.abs(dx) < 1e-7) break;
+    t -= (xAt - x) / dx;
+    t = Math.max(0, Math.min(1, t));
+  }
+  return t;
 }
 
-function removeImage(id) {
-    const removedSet = loadRemoved();
-    removedSet.add(id);
-    saveRemoved(removedSet);
-    removedStack.push(id);
-    updateUndoBar();
-    render();
+function applyCurve(x) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const mhxR = 2 * curve.mx - curve.mhx;
+  const mhyR = 2 * curve.my - curve.mhy;
+  if (x <= curve.mx) {
+    const t = solveT(x, 0, curve.x1, curve.mhx, curve.mx);
+    return cubicB(t, 0, curve.y1, curve.mhy, curve.my);
+  } else {
+    const t = solveT(x, curve.mx, mhxR, curve.x2, 1);
+    return cubicB(t, curve.my, mhyR, curve.y2, 1);
+  }
 }
 
-function undoRemove() {
-    if (removedStack.length === 0) return;
-    const id = removedStack.pop();
-    const removedSet = loadRemoved();
-    removedSet.delete(id);
-    saveRemoved(removedSet);
-    updateUndoBar();
-    render();
-}
+// ===== CURVE CANVAS =====
+function initCurveEditor() {
+  const canvas = document.getElementById('curveCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width;
+  const H = 180;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
 
-function updateUndoBar() {
-    const bar = document.getElementById('undo-bar');
-    if (removedStack.length > 0) {
-        const lastId = removedStack[removedStack.length - 1];
-        document.getElementById('undo-text').textContent = `Poistettu: ${lastId}`;
-        bar.classList.add('visible');
-    } else {
-        bar.classList.remove('visible');
+  const pad = 16;
+  const gw = W - pad * 2;
+  const gh = H - pad * 2;
+
+  function toScreen(x, y) { return [pad + x * gw, pad + (1 - y) * gh]; }
+  function fromScreen(sx, sy) { return [(sx - pad) / gw, 1 - (sy - pad) / gh]; }
+
+  // Draggable: 'cp1', 'cp2', 'mid', 'mh'
+  let dragging = null;
+
+  function draw(curveProgress) {
+    ctx.clearRect(0, 0, W, H);
+    const mhxR = 2 * curve.mx - curve.mhx;
+    const mhyR = 2 * curve.my - curve.mhy;
+
+    // Grid
+    ctx.strokeStyle = '#1e1c1a';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const [x] = toScreen(i/4, 0);
+      const [, y2] = toScreen(0, i/4);
+      ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, pad + gh); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad, y2); ctx.lineTo(pad + gw, y2); ctx.stroke();
     }
+
+    // Diagonal
+    ctx.strokeStyle = '#2a2622';
+    ctx.setLineDash([3, 3]);
+    const [dx0, dy0] = toScreen(0, 0);
+    const [dx1, dy1] = toScreen(1, 1);
+    ctx.beginPath(); ctx.moveTo(dx0, dy0); ctx.lineTo(dx1, dy1); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw two bezier segments
+    ctx.strokeStyle = '#c8b8a4';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const [sx, sy] = toScreen(0, 0);
+    ctx.moveTo(sx, sy);
+    // Segment 1: (0,0) → (x1,y1) → (mhx,mhy) → (mx,my)
+    for (let i = 1; i <= 40; i++) {
+      const t = i / 40;
+      const bx = cubicB(t, 0, curve.x1, curve.mhx, curve.mx);
+      const by = cubicB(t, 0, curve.y1, curve.mhy, curve.my);
+      const [px, py] = toScreen(bx, by);
+      ctx.lineTo(px, py);
+    }
+    // Segment 2: (mx,my) → (mhxR,mhyR) → (x2,y2) → (1,1)
+    for (let i = 1; i <= 40; i++) {
+      const t = i / 40;
+      const bx = cubicB(t, curve.mx, mhxR, curve.x2, 1);
+      const by = cubicB(t, curve.my, mhyR, curve.y2, 1);
+      const [px, py] = toScreen(bx, by);
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Control lines
+    ctx.strokeStyle = 'rgba(200,180,160,0.25)';
+    ctx.lineWidth = 1;
+    const [c1x, c1y] = toScreen(curve.x1, curve.y1);
+    const [c2x, c2y] = toScreen(curve.x2, curve.y2);
+    const [msx, msy] = toScreen(curve.mx, curve.my);
+    const [mhsx, mhsy] = toScreen(curve.mhx, curve.mhy);
+    const [mhrx, mhry] = toScreen(mhxR, mhyR);
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(c1x, c1y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...toScreen(1,1)); ctx.lineTo(c2x, c2y); ctx.stroke();
+    // Mid handle lines
+    ctx.beginPath(); ctx.moveTo(mhsx, mhsy); ctx.lineTo(msx, msy); ctx.lineTo(mhrx, mhry); ctx.stroke();
+
+    // Control points
+    const points = [
+      { x: c1x, y: c1y, id: 'cp1', r: 5, col: '#c8b8a4' },
+      { x: c2x, y: c2y, id: 'cp2', r: 5, col: '#c8b8a4' },
+      { x: mhsx, y: mhsy, id: 'mh', r: 4, col: '#8a9aaa' },
+      { x: mhrx, y: mhry, id: 'mh_mirror', r: 3, col: '#5a6a7a' },
+      { x: msx, y: msy, id: 'mid', r: 6, col: '#e8c888' },
+    ];
+    for (const pt of points) {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+      ctx.fillStyle = (dragging === pt.id) ? '#fff' : pt.col;
+      ctx.fill();
+    }
+
+    // Progress indicator
+    if (curveProgress !== undefined && curveProgress > 0.001 && curveProgress < 0.999) {
+      const cy = applyCurve(curveProgress);
+      const [ix, iy] = toScreen(curveProgress, cy);
+      ctx.beginPath();
+      ctx.arc(ix, iy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff9060';
+      ctx.fill();
+    }
+  }
+
+  function hitTest(sx, sy) {
+    const mhxR = 2 * curve.mx - curve.mhx;
+    const mhyR = 2 * curve.my - curve.mhy;
+    const pts = [
+      { s: toScreen(curve.mx, curve.my), id: 'mid' },
+      { s: toScreen(curve.mhx, curve.mhy), id: 'mh' },
+      { s: toScreen(curve.x1, curve.y1), id: 'cp1' },
+      { s: toScreen(curve.x2, curve.y2), id: 'cp2' },
+    ];
+    for (const p of pts) {
+      if (Math.hypot(sx - p.s[0], sy - p.s[1]) < 14) return p.id;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    dragging = hitTest(e.clientX - r.left, e.clientY - r.top);
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const r = canvas.getBoundingClientRect();
+    const [nx, ny] = fromScreen(e.clientX - r.left, e.clientY - r.top);
+    const cx = Math.max(0, Math.min(1, nx));
+    const cy = Math.max(0, Math.min(1, ny));
+    if (dragging === 'cp1') { curve.x1 = Math.min(cx, curve.mx); curve.y1 = cy; }
+    else if (dragging === 'cp2') { curve.x2 = Math.max(cx, curve.mx); curve.y2 = cy; }
+    else if (dragging === 'mid') {
+      const dx = cx - curve.mx, dy = cy - curve.my;
+      curve.mx = Math.max(0.05, Math.min(0.95, cx));
+      curve.my = Math.max(0, Math.min(1, cy));
+      curve.mhx = Math.max(0, Math.min(1, curve.mhx + dx));
+      curve.mhy = Math.max(0, Math.min(1, curve.mhy + dy));
+    }
+    else if (dragging === 'mh') { curve.mhx = Math.max(0, Math.min(curve.mx, cx)); curve.mhy = cy; }
+  });
+
+  window.addEventListener('mouseup', () => { dragging = null; });
+
+  // Reset curve button
+  document.getElementById('btnResetCurve').addEventListener('click', () => {
+    Object.assign(curve, CURVE_DEFAULTS);
+  });
+
+  return draw;
 }
 
-/* --- LAYOUTS (localStorage) --- */
-const LAYOUT_KEY = 'akvarellit_layouts';
+// ===== BIND SLIDERS =====
+function bindSliders() {
+  const map = {
+    sSpeed: 'speed', sLerp: 'lerp', sNoiseScale: 'noiseScale',
+    sNoiseSpeed: 'noiseSpeed', sNoiseAmp: 'noiseAmp', sFeather: 'feather',
+    sRadius: 'radius', sNextScale: 'nextScale',
+    sWarpScale: 'warpScale', sWarpIntensity: 'warpIntensity',
+    sWarpSpeed: 'warpSpeed', sBleed: 'bleed',
+    sZoomPow: 'zoomPow',
+    sBarrel: 'barrel', sParallax: 'parallax', sZoomMouse: 'zoomMouse',
+    sAber: 'aber', sVig: 'vig', sGrain: 'grain', sGlow: 'glow',
+  };
 
-function loadLayouts() {
-    try {
-        const raw = localStorage.getItem(LAYOUT_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
+  // Transition mode selector
+  const modeSelect = document.getElementById('sTransMode');
+  const radialDiv = document.getElementById('radialControls');
+  const waterDiv = document.getElementById('watercolorControls');
+  modeSelect.value = S.transMode;
+  function updateModeUI() {
+    radialDiv.style.display = S.transMode === 0 ? '' : 'none';
+    waterDiv.style.display = S.transMode === 1 ? '' : 'none';
+  }
+  updateModeUI();
+  modeSelect.addEventListener('change', () => {
+    S.transMode = parseInt(modeSelect.value);
+    updateModeUI();
+  });
+  const toggleMap = {
+    tAber: 'aberOn', tVig: 'vigOn', tGrain: 'grainOn', tGlow: 'glowOn', tColor: 'colorOn',
+  };
+
+  for (const [id, key] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    const valEl = el.parentElement.querySelector('.val');
+    el.value = S[key];
+    valEl.textContent = Number(S[key]).toFixed(3);
+    el.addEventListener('input', () => {
+      S[key] = parseFloat(el.value);
+      valEl.textContent = Number(S[key]).toFixed(3);
+    });
+  }
+  for (const [id, key] of Object.entries(toggleMap)) {
+    const el = document.getElementById(id);
+    el.checked = S[key];
+    el.addEventListener('change', () => { S[key] = el.checked; });
+  }
+
+  // Save button
+  document.getElementById('btnSave').addEventListener('click', () => {
+    const data = { settings: { ...S }, curve: { ...curve } };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const btn = document.getElementById('btnSave');
+    btn.textContent = 'TALLENNETTU ✓';
+    btn.classList.add('saved');
+    setTimeout(() => { btn.textContent = 'TALLENNA'; btn.classList.remove('saved'); }, 1500);
+  });
+
+  // Reset button
+  document.getElementById('btnReset').addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    Object.assign(S, DEFAULTS);
+    Object.assign(curve, CURVE_DEFAULTS);
+    // Update all sliders and toggles
+    for (const [id, key] of Object.entries(map)) {
+      const el = document.getElementById(id);
+      const valEl = el.parentElement.querySelector('.val');
+      el.value = S[key];
+      valEl.textContent = Number(S[key]).toFixed(3);
+    }
+    for (const [id, key] of Object.entries(toggleMap)) {
+      document.getElementById(id).checked = S[key];
+    }
+    document.getElementById('sTransMode').value = S.transMode;
+    updateModeUI();
+  });
 }
 
-function saveLayoutsData(layouts) {
-    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layouts));
+// ===== MAIN =====
+function shuffle(arr, seed) {
+  let s = seed; const a = [...arr];
+  const rng = () => { s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; };
+  for (let i=a.length-1;i>0;i--) { const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
 }
 
-function setPageLayout(pageIdx, count) {
-    const layouts = loadLayouts();
-    while (layouts.length <= pageIdx) layouts.push(1);
-    layouts[pageIdx] = count;
-    saveLayoutsData(layouts);
-    render();
-}
+async function init() {
+  const catalog = await (await fetch('catalog.json')).json();
+  const paintings = shuffle(catalog, 42);
+  const total = paintings.length;
 
-/* --- SAVE TO FILE --- */
-function saveToFile() {
-    const data = {
-        saved: new Date().toISOString(),
-        order: loadOrder().map(img => img.id),
-        removed: [...loadRemoved()],
-        layouts: loadLayouts()
+  const canvas = document.getElementById('c');
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+  if (!gl) { alert('WebGL ei tuettu'); return; }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function compileShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; }
+    return s;
+  }
+
+  const vs = compileShader(gl.VERTEX_SHADER, document.getElementById('vs').textContent);
+  const fs = compileShader(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(prog)); return; }
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  // All uniform locations
+  const U = {};
+  ['uCurrent','uNext','uProgress','uMouse','uTime','uResolution','uCurrentSize','uNextSize',
+   'uNoiseScale','uNoiseSpeed','uNoiseAmp','uFeather','uRadiusMult','uNextStartScale',
+   'uTransitionMode','uWarpScale','uWarpIntensity','uWarpSpeed','uBleedAmt',
+   'uZoomPow','uBarrelAmt','uParallaxAmt','uZoomMouse',
+   'uAberAmt','uVigDark','uGrainAmt','uGlowAmt','uColorGrade'
+  ].forEach(name => { U[name] = gl.getUniformLocation(prog, name); });
+
+  // Texture loading
+  const texCache = {};
+  function loadTexture(idx) {
+    const i = ((idx % total) + total) % total;
+    if (texCache[i]) return texCache[i];
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([10,9,8,255]));
+    const entry = { tex, width: 1, height: 1, ready: false };
+    texCache[i] = entry;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      entry.width = img.naturalWidth; entry.height = img.naturalHeight; entry.ready = true;
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'asetukset.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    document.getElementById('save-status').textContent = 'Tallennettu: asetukset.json';
-    setTimeout(() => document.getElementById('save-status').textContent = '', 3000);
-}
+    img.src = `akvarellit/${paintings[i].filename}`;
+    return entry;
+  }
 
-/* --- ORDER (localStorage) --- */
-const ORDER_KEY = 'akvarellit_order';
+  [0,1,2,3].forEach(i => loadTexture(i));
+  await new Promise(resolve => {
+    const check = () => {
+      if (texCache[0]?.ready && texCache[1]?.ready) resolve();
+      else setTimeout(check, 50);
+    }; check();
+  });
+  document.getElementById('loader').classList.add('gone');
 
-function loadOrder() {
-    try {
-        const raw = localStorage.getItem(ORDER_KEY);
-        if (raw) {
-            const ids = JSON.parse(raw);
-            const byId = {};
-            catalog.forEach(img => byId[img.id] = img);
-            const ordered = ids.map(id => byId[id]).filter(Boolean);
-            const savedSet = new Set(ids);
-            catalog.forEach(img => { if (!savedSet.has(img.id)) ordered.push(img); });
-            return ordered;
-        }
-    } catch {}
-    return [...catalog];
-}
+  // Init UI
+  bindSliders();
+  const drawCurve = initCurveEditor();
 
-function saveOrder(ordered) {
-    localStorage.setItem(ORDER_KEY, JSON.stringify(ordered.map(img => img.id)));
-}
-
-function doGlobalSwap() {
-    const aVal = parseInt(document.getElementById('swap-a').value);
-    const bVal = parseInt(document.getElementById('swap-b').value);
-    const statusEl = document.getElementById('swap-status');
-    if (!aVal || !bVal || aVal === bVal) {
-        statusEl.textContent = 'Anna kaksi eri numeroa';
-        return;
+  // Panel toggle
+  const panel = document.getElementById('panel');
+  const panelHint = document.getElementById('panelHint');
+  let panelOpen = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 's' || e.key === 'S') {
+      if (e.metaKey || e.ctrlKey) return; // don't hijack save
+      panelOpen = !panelOpen;
+      panel.classList.toggle('open', panelOpen);
+      panelHint.style.opacity = panelOpen ? '0' : '1';
+      e.preventDefault();
     }
-    if (aVal < 1 || aVal > catalog.length || bVal < 1 || bVal > catalog.length) {
-        statusEl.textContent = 'Numero 1\u2013' + catalog.length;
-        return;
+  });
+
+  // State
+  let currentIndex = 0;
+  let progress = 0, targetProgress = 0;
+  let mouseX = 0.5, mouseY = 0.5;
+  let smoothMouseX = 0.5, smoothMouseY = 0.5;
+  let titleHidden = false;
+  const titleEl = document.getElementById('title');
+  const counterEl = document.getElementById('counter');
+  const progFill = document.getElementById('progFill');
+
+  // Input
+  window.addEventListener('wheel', (e) => {
+    if (panelOpen && e.target.closest('#panel')) return; // allow panel scroll
+    e.preventDefault();
+    targetProgress += e.deltaY * S.speed;
+    if (currentIndex === 0 && targetProgress < 0) targetProgress = 0;
+    if (currentIndex >= total - 2 && targetProgress > 1) targetProgress = 1;
+  }, { passive: false });
+
+  let touchY = 0;
+  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const dy = touchY - e.touches[0].clientY; touchY = e.touches[0].clientY;
+    targetProgress += dy * S.speed * 4;
+    if (currentIndex === 0 && targetProgress < 0) targetProgress = 0;
+    if (currentIndex >= total - 2 && targetProgress > 1) targetProgress = 1;
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+      targetProgress += 0.12; e.preventDefault();
     }
-    if (swapImages(aVal, bVal)) {
-        statusEl.textContent = `AKV-${String(aVal).padStart(3,'0')} \u21C4 AKV-${String(bVal).padStart(3,'0')}`;
-        document.getElementById('swap-a').value = '';
-        document.getElementById('swap-b').value = '';
-        render();
-        setTimeout(() => statusEl.textContent = '', 3000);
-    } else {
-        statusEl.textContent = 'Vaihto epäonnistui';
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      targetProgress -= 0.12; e.preventDefault();
     }
+    if (currentIndex === 0 && targetProgress < 0) targetProgress = 0;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX / window.innerWidth;
+    mouseY = 1.0 - e.clientY / window.innerHeight;
+  });
+
+  // Render
+  const startTime = performance.now();
+
+  function render() {
+    requestAnimationFrame(render);
+
+    progress += (targetProgress - progress) * S.lerp;
+    if (Math.abs(targetProgress - progress) < 0.0005) progress = targetProgress;
+
+    smoothMouseX += (mouseX - smoothMouseX) * 0.05;
+    smoothMouseY += (mouseY - smoothMouseY) * 0.05;
+
+    if (progress > 0.999 && targetProgress >= 1.0 && currentIndex < total - 2) {
+      currentIndex++; progress -= 1.0; targetProgress -= 1.0;
+      loadTexture(currentIndex + 2); loadTexture(currentIndex + 3);
+    } else if (progress < 0.001 && targetProgress <= 0.0 && currentIndex > 0) {
+      currentIndex--; progress += 1.0; targetProgress += 1.0;
+    }
+    progress = Math.max(0, Math.min(1, progress));
+
+    // Apply curve
+    const curvedP = applyCurve(progress);
+
+    if (progress > 0.03 && !titleHidden) { titleEl.classList.add('hidden'); titleHidden = true; }
+
+    const ci = ((currentIndex % total) + total) % total;
+    const ni = (((currentIndex + 1) % total) + total) % total;
+    const curTex = texCache[ci] || loadTexture(ci);
+    const nxtTex = texCache[ni] || loadTexture(ni);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, curTex.tex);
+    gl.uniform1i(U.uCurrent, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, nxtTex.tex);
+    gl.uniform1i(U.uNext, 1);
+
+    gl.uniform1f(U.uProgress, curvedP);
+    gl.uniform2f(U.uMouse, smoothMouseX, smoothMouseY);
+    gl.uniform1f(U.uTime, (performance.now() - startTime) * 0.001);
+    gl.uniform2f(U.uResolution, canvas.width, canvas.height);
+    gl.uniform2f(U.uCurrentSize, curTex.width, curTex.height);
+    gl.uniform2f(U.uNextSize, nxtTex.width, nxtTex.height);
+
+    // Tweakable uniforms
+    gl.uniform1f(U.uNoiseScale, S.noiseScale);
+    gl.uniform1f(U.uNoiseSpeed, S.noiseSpeed);
+    gl.uniform1f(U.uNoiseAmp, S.noiseAmp);
+    gl.uniform1f(U.uFeather, S.feather);
+    gl.uniform1f(U.uRadiusMult, S.radius);
+    gl.uniform1f(U.uNextStartScale, S.nextScale);
+    gl.uniform1f(U.uTransitionMode, S.transMode);
+    gl.uniform1f(U.uWarpScale, S.warpScale);
+    gl.uniform1f(U.uWarpIntensity, S.warpIntensity);
+    gl.uniform1f(U.uWarpSpeed, S.warpSpeed);
+    gl.uniform1f(U.uBleedAmt, S.bleed);
+    gl.uniform1f(U.uZoomPow, S.zoomPow);
+    gl.uniform1f(U.uBarrelAmt, S.barrel);
+    gl.uniform1f(U.uParallaxAmt, S.parallax);
+    gl.uniform1f(U.uZoomMouse, S.zoomMouse);
+    gl.uniform1f(U.uAberAmt, S.aberOn ? S.aber : 0.0);
+    gl.uniform1f(U.uVigDark, S.vigOn ? S.vig : 0.0);
+    gl.uniform1f(U.uGrainAmt, S.grainOn ? S.grain : 0.0);
+    gl.uniform1f(U.uGlowAmt, S.glowOn ? S.glow : 0.0);
+    gl.uniform1f(U.uColorGrade, S.colorOn ? 1.0 : 0.0);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // UI updates
+    counterEl.textContent = `${currentIndex + 1} / ${total}`;
+    progFill.style.width = (progress * 100) + '%';
+    if (panelOpen) drawCurve(progress);
+  }
+
+  requestAnimationFrame(render);
 }
 
-function swapImages(id1Num, id2Num) {
-    const ordered = loadOrder();
-    const idx1 = ordered.findIndex(img => img.id === 'AKV-' + String(id1Num).padStart(3, '0'));
-    const idx2 = ordered.findIndex(img => img.id === 'AKV-' + String(id2Num).padStart(3, '0'));
-    if (idx1 === -1 || idx2 === -1) return false;
-    [ordered[idx1], ordered[idx2]] = [ordered[idx2], ordered[idx1]];
-    saveOrder(ordered);
-    return true;
-}
-
-/* --- HELPERS --- */
-function makeOverlay(img) {
-    const overlay = document.createElement('div');
-    overlay.className = 'overlay';
-    const swapInput = document.createElement('input');
-    swapInput.className = 'swap-input';
-    swapInput.type = 'text';
-    swapInput.placeholder = '#';
-    swapInput.title = 'Vaihda paikka: kirjoita toisen kuvan numero';
-    const swapBtn = document.createElement('button');
-    swapBtn.className = 'swap-btn';
-    swapBtn.textContent = '\u21C4';
-    swapBtn.title = 'Vaihda';
-    const thisNum = parseInt(img.id.replace('AKV-', ''));
-    function doSwap() {
-        const target = parseInt(swapInput.value);
-        if (target && target !== thisNum && target >= 1 && target <= catalog.length) {
-            if (swapImages(thisNum, target)) render();
-        }
-    }
-    swapInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSwap(); } });
-    swapBtn.addEventListener('click', e => { e.stopPropagation(); doSwap(); });
-    overlay.appendChild(swapInput);
-    overlay.appendChild(swapBtn);
-
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = 'Poista';
-    removeBtn.title = 'Poista kuva';
-    removeBtn.addEventListener('click', e => { e.stopPropagation(); removeImage(img.id); });
-    overlay.appendChild(removeBtn);
-
-    return overlay;
-}
-
-function makeIdTag(img) {
-    const t = document.createElement('span');
-    t.className = 'id-tag';
-    t.textContent = img.id;
-    return t;
-}
-
-// Build a single A4 page element with 1, 2 or 3 images
-// pageIdx = index in the layouts array (for the layout selector)
-function buildA4(images, pageIdx, layoutCount) {
-    const page = document.createElement('div');
-
-    if (images.length === 1) {
-        page.className = 'a4';
-        const imgEl = document.createElement('img');
-        imgEl.src = 'akvarellit/' + images[0].f;
-        imgEl.alt = images[0].id;
-        imgEl.loading = 'lazy';
-        page.appendChild(imgEl);
-        page.appendChild(makeOverlay(images[0]));
-        page.appendChild(makeIdTag(images[0]));
-    } else {
-        page.className = 'a4 multi';
-        images.forEach(img => {
-            const slot = document.createElement('div');
-            slot.className = 'img-slot';
-            const imgEl = document.createElement('img');
-            imgEl.src = 'akvarellit/' + img.f;
-            imgEl.alt = img.id;
-            imgEl.loading = 'lazy';
-            slot.appendChild(imgEl);
-            slot.appendChild(makeOverlay(img));
-            slot.appendChild(makeIdTag(img));
-            page.appendChild(slot);
-        });
-    }
-
-    // Layout selector (1/2/3 images per page)
-    if (pageIdx !== undefined) {
-        const select = document.createElement('select');
-        select.className = 'layout-select';
-        [1, 2, 3].forEach(n => {
-            const opt = document.createElement('option');
-            opt.value = n;
-            opt.textContent = n + (n === 1 ? ' kuva' : ' kuvaa');
-            select.appendChild(opt);
-        });
-        select.value = layoutCount || images.length;
-        select.addEventListener('change', () => {
-            setPageLayout(pageIdx, parseInt(select.value));
-        });
-        page.appendChild(select);
-    }
-
-    return page;
-}
-
-/* --- DISTRIBUTE IMAGES ACROSS PAGES --- */
-// Each page consumes 1, 2 or 3 images based on its layout setting.
-// Returns array of { images: [...], layout: N, pageIdx: N }
-function distributeImages(images, layouts) {
-    const pages = [];
-    let imgIdx = 0;
-    let pageIdx = 0;
-
-    while (imgIdx < images.length) {
-        const layout = (pageIdx < layouts.length) ? layouts[pageIdx] : 1;
-        const count = Math.min(layout, images.length - imgIdx);
-        pages.push({
-            images: images.slice(imgIdx, imgIdx + count),
-            layout: layout,
-            pageIdx: pageIdx
-        });
-        imgIdx += count;
-        pageIdx++;
-    }
-
-    return pages;
-}
-
-/* --- RENDER --- */
-function render() {
-    const allImages = loadOrder();
-    const removedSet = loadRemoved();
-    const images = allImages.filter(img => !removedSet.has(img.id));
-    const layouts = loadLayouts();
-    const container = document.getElementById('book');
-    container.innerHTML = '';
-
-    const a4Pages = distributeImages(images, layouts);
-
-    if (a4Pages.length === 0) return;
-
-    // --- COVER (page index 0) ---
-    const coverWrap = document.createElement('div');
-    coverWrap.className = 'cover-wrap';
-    coverWrap.appendChild(buildA4(a4Pages[0].images, a4Pages[0].pageIdx, a4Pages[0].layout));
-    container.appendChild(coverWrap);
-
-    const coverLabel = document.createElement('div');
-    coverLabel.className = 'spread-label';
-    coverLabel.textContent = 'Kansi (sivu 1)';
-    container.appendChild(coverLabel);
-
-    // --- SPREADS ---
-    // Page 2 is always blank, then content pages follow
-    const innerPages = a4Pages.slice(1, a4Pages.length - 1);
-    // Prepend null for the blank page 2
-    const spreadPages = [null, ...innerPages];
-
-    for (let i = 0; i < spreadPages.length; i += 2) {
-        const spread = document.createElement('div');
-        spread.className = 'spread';
-
-        // Left page
-        if (spreadPages[i]) {
-            const p = spreadPages[i];
-            const leftPage = buildA4(p.images, p.pageIdx, p.layout);
-            leftPage.classList.add('left');
-            spread.appendChild(leftPage);
-        } else {
-            const empty = document.createElement('div');
-            empty.className = 'a4 left';
-            empty.style.background = '#fafafa';
-            spread.appendChild(empty);
-        }
-
-        // Right page
-        if (i + 1 < spreadPages.length && spreadPages[i + 1]) {
-            const p = spreadPages[i + 1];
-            spread.appendChild(buildA4(p.images, p.pageIdx, p.layout));
-        } else {
-            const empty = document.createElement('div');
-            empty.className = 'a4';
-            empty.style.background = '#fafafa';
-            spread.appendChild(empty);
-        }
-
-        container.appendChild(spread);
-
-        const label = document.createElement('div');
-        label.className = 'spread-label';
-        const leftNum = i + 2; // page 2 is blank, page 3 is first content
-        const rightNum = i + 3;
-        label.textContent = `Sivut ${leftNum}\u2013${rightNum}`;
-        container.appendChild(label);
-    }
-
-    // --- BACK COVER ---
-    if (a4Pages.length > 1) {
-        const last = a4Pages[a4Pages.length - 1];
-        const backWrap = document.createElement('div');
-        backWrap.className = 'cover-wrap';
-        backWrap.appendChild(buildA4(last.images, last.pageIdx, last.layout));
-        container.appendChild(backWrap);
-
-        const backLabel = document.createElement('div');
-        backLabel.className = 'spread-label';
-        backLabel.textContent = 'Takakansi';
-        container.appendChild(backLabel);
-    }
-
-    const totalBookPages = 1 + 1 + spreadPages.length + 1; // cover + blank + inner + back
-    document.getElementById('subtitle').textContent =
-        `${images.length} maalausta \u2014 ${a4Pages.length} sivua sisältöä \u2014 kirjaladonta \u2014 2.5mm reunus`;
-}
-
-render();
+init();
 </script>
 </body>
 </html>
