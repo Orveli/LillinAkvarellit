@@ -15,7 +15,6 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     z-index: 50; pointer-events: none;
-    transition: opacity 1.5s;
   }
   #title.hidden { opacity: 0; }
   #title h1 {
@@ -56,6 +55,16 @@
     color: #3a342e; font-size: 0.8rem;
     letter-spacing: 0.4em; font-weight: 300;
   }
+
+  /* ===== PANEL-OPEN LAYOUT SHIFT ===== */
+  canvas#c { transition: width 0.35s ease; }
+  body.panel-open canvas#c { width: calc(100% - 320px); }
+
+  #title { transition: opacity 1.5s, right 0.35s ease; }
+  body.panel-open #title { right: 320px; }
+
+  #counter { transition: left 0.35s ease; }
+  body.panel-open #counter { left: calc(50% - 160px); }
 
   /* ===== SETTINGS PANEL ===== */
   #panel {
@@ -211,7 +220,12 @@
   <div id="revealControls" style="display:none">
     <div class="ctrl"><label>Reveal-nopeus</label><input type="range" id="sRevealSpeed" min="0.2" max="1.0" step="0.01" value="0.55"><span class="val"></span></div>
     <div class="ctrl"><label>Kanavasplit</label><input type="range" id="sChannelSplit" min="0" max="1.0" step="0.01" value="0"><span class="val"></span></div>
+    <div class="ctrl"><label>Reunahehku</label><input type="range" id="sEdgeGlow" min="0" max="1.5" step="0.02" value="0.5"><span class="val"></span></div>
+    <div class="ctrl"><label>Pigmenttireuna</label><input type="range" id="sEdgeDarken" min="0" max="1.0" step="0.02" value="0.4"><span class="val"></span></div>
+    <div class="ctrl"><label>Maski-zoom</label><input type="range" id="sRevealZoom" min="0" max="1.5" step="0.01" value="0.3"><span class="val"></span></div>
   </div>
+
+  <div class="ctrl"><label>Black burn joka N:s</label><input type="range" id="sBlackBurnEvery" min="0" max="20" step="1" value="5"><span class="val"></span></div>
 
   <h2>Zoom & liike</h2>
   <div class="ctrl"><label>Zoom-teho</label><input type="range" id="sZoomPow" min="1.5" max="40" step="0.5" value="7"><span class="val"></span></div>
@@ -300,7 +314,10 @@ uniform float uBleedAmt;
 
 // Image reveal
 uniform float uRevealSpeed;    // pow exponent for reveal progress (< 1 = faster reveal)
+uniform float uRevealZoom;     // how much the reveal mask zooms with scroll progress
 uniform float uChannelSplit;   // 0 = pure luma, >0 = per-channel offset
+uniform float uEdgeGlow;       // warm glow intensity at reveal boundary
+uniform float uEdgeDarken;     // pigment pooling darkening at reveal boundary
 
 // Scroll-based zoom drift & next image spawn offset
 uniform vec2 uZoomDrift;
@@ -431,6 +448,11 @@ void main() {
 
     // Warp the reveal texture sampling UVs so the pattern breathes
     vec2 rUv = coverUv(uv, uRevealSize, uResolution);
+    // Zoom the reveal mask with scroll progress
+    if (uRevealZoom > 0.001) {
+      float rZoom = 1.0 + uRevealZoom * rp;
+      rUv = (rUv - 0.5) / rZoom + 0.5;
+    }
     float t = uTime * uWarpSpeed;
     vec2 warpedRUv = rUv;
     if (uWarpIntensity > 0.001) {
@@ -501,6 +523,34 @@ void main() {
     col = mix(nxtCol, curCol, maskedBoundary);
   }
 
+  // ---- Watercolor edge bloom (pigment pooling + warm glow at reveal boundary) ----
+  if (uTransitionMode > 1.5 && (uEdgeGlow > 0.001 || uEdgeDarken > 0.001)) {
+    // Edge intensity: peaks right at the reveal boundary, fades on both sides
+    float edge = maskedBoundary * (1.0 - maskedBoundary) * 4.0;
+    // Sharper pigment line (narrow dark band like paint pooling at brush edge)
+    float edgeSharp = pow(edge, 1.5);
+    // Wider soft glow (warm light bleeding from the revealed area)
+    float edgeWide = pow(edge, 0.6);
+
+    // Pigment darkening: darken and slightly saturate at the boundary
+    if (uEdgeDarken > 0.001) {
+      float lum = dot(col, vec3(0.299, 0.587, 0.114));
+      vec3 saturated = col / max(lum, 0.01) * lum; // push toward hue
+      // Warm tint for the darkening (like watercolor pigment pooling)
+      vec3 darkTint = col * vec3(0.7, 0.55, 0.4);
+      col = mix(col, darkTint, edgeSharp * uEdgeDarken * 0.6);
+      // Boost saturation at edge
+      vec3 gray = vec3(lum);
+      col = mix(gray, col, 1.0 + edgeSharp * uEdgeDarken * 0.4);
+    }
+
+    // Warm glow: soft luminance emanating from the reveal edge
+    if (uEdgeGlow > 0.001) {
+      vec3 warmLight = vec3(1.0, 0.92, 0.8); // warm paper-like glow
+      col += warmLight * edgeWide * uEdgeGlow * 0.35;
+    }
+  }
+
   // ---- Mouse glow ----
   if (uGlowAmt > 0.0) {
     float md = length(uv - uMouse);
@@ -538,7 +588,11 @@ const DEFAULTS = {
   transMode: 0,
   warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
   revealSpeed: 0.55,
+  revealZoom: 0.3,
   channelSplit: 0,
+  edgeGlow: 0.5,
+  edgeDarken: 0.4,
+  blackBurnEvery: 5,
   zoomPow: 7, barrel: 0.15, parallax: 0.015, zoomMouse: 0.06,
   aber: 0.015, aberOn: true, vig: 0.55, vigOn: true,
   grain: 0.025, grainOn: true, glow: 0.25, glowOn: true, colorOn: true,
@@ -560,6 +614,7 @@ function loadSavedSettings() {
   } catch { return null; }
 }
 
+// Load saved settings: localStorage overrides file-based defaults
 const saved = loadSavedSettings();
 const S = { ...DEFAULTS, ...(saved?.settings || {}) };
 
@@ -568,6 +623,20 @@ const S = { ...DEFAULTS, ...(saved?.settings || {}) };
 // Seg1: (0,0) → (x1,y1) → (mhx,mhy) → (mx,my)
 // Seg2: (mx,my) → (mirror of mh) → (x2,y2) → (1,1)
 const curve = { ...CURVE_DEFAULTS, ...(saved?.curve || {}) };
+
+// Try to load settings.json (git-tracked preset) as base layer
+fetch('settings.json').then(r => r.ok ? r.json() : null).then(file => {
+  if (!file) return;
+  // File settings fill in where localStorage hasn't overridden
+  const localKeys = saved?.settings ? Object.keys(saved.settings) : [];
+  for (const [k, v] of Object.entries(file.settings || {})) {
+    if (!localKeys.includes(k)) S[k] = v;
+  }
+  const localCurveKeys = saved?.curve ? Object.keys(saved.curve) : [];
+  for (const [k, v] of Object.entries(file.curve || {})) {
+    if (!localCurveKeys.includes(k)) curve[k] = v;
+  }
+}).catch(() => {});
 
 function cubicB(t, p0, p1, p2, p3) {
   const mt = 1 - t;
@@ -780,7 +849,11 @@ function bindSliders() {
     sWarpScale: 'warpScale', sWarpIntensity: 'warpIntensity',
     sWarpSpeed: 'warpSpeed', sBleed: 'bleed',
     sRevealSpeed: 'revealSpeed',
+    sRevealZoom: 'revealZoom',
     sChannelSplit: 'channelSplit',
+    sEdgeGlow: 'edgeGlow',
+    sEdgeDarken: 'edgeDarken',
+    sBlackBurnEvery: 'blackBurnEvery',
     sZoomPow: 'zoomPow',
     sBarrel: 'barrel', sParallax: 'parallax', sZoomMouse: 'zoomMouse',
     sAber: 'aber', sVig: 'vig', sGrain: 'grain', sGlow: 'glow',
@@ -822,10 +895,17 @@ function bindSliders() {
     el.addEventListener('change', () => { S[key] = el.checked; });
   }
 
-  // Save button
+  // Save button – saves to localStorage AND downloads settings.json for git
   document.getElementById('btnSave').addEventListener('click', () => {
     const data = { settings: { ...S }, curve: { ...curve } };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    // Download settings.json so it can be committed to git
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'settings.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
     const btn = document.getElementById('btnSave');
     btn.textContent = 'TALLENNETTU ✓';
     btn.classList.add('saved');
@@ -869,9 +949,12 @@ async function init() {
   const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
   if (!gl) { alert('WebGL ei tuettu'); return; }
 
+  let panelOpen = false;
+
   function resize() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
+    const w = panelOpen ? window.innerWidth - 320 : window.innerWidth;
+    canvas.width = w * dpr;
     canvas.height = window.innerHeight * dpr;
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
@@ -906,7 +989,7 @@ async function init() {
   ['uCurrent','uNext','uReveal','uProgress','uMouse','uTime','uResolution','uCurrentSize','uNextSize','uRevealSize',
    'uNoiseScale','uNoiseSpeed','uNoiseAmp','uFeather','uRadiusMult','uNextStartScale',
    'uTransitionMode','uWarpScale','uWarpIntensity','uWarpSpeed','uBleedAmt',
-   'uRevealSpeed','uChannelSplit',
+   'uRevealSpeed','uRevealZoom','uChannelSplit','uEdgeGlow','uEdgeDarken',
    'uZoomPow','uBarrelAmt','uParallaxAmt','uZoomMouse',
    'uAberAmt','uVigDark','uGrainAmt','uGlowAmt','uColorGrade',
    'uZoomDrift','uNextOffset'
@@ -916,6 +999,16 @@ async function init() {
   const texCache = {};
   // Queue of decoded images waiting to be uploaded to GPU (one per frame to avoid stalls)
   const pendingUploads = [];
+
+  // Black burn placeholder texture (1x1 near-black pixel)
+  const blackTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, blackTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([10,9,8,255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const blackEntry = { tex: blackTex, width: 1, height: 1, ready: true };
 
   function loadTexture(idx) {
     const i = ((idx % total) + total) % total;
@@ -931,7 +1024,7 @@ async function init() {
     texCache[i] = entry;
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = `akvarellit/${paintings[i].filename}`;
+    img.src = `akvarellit/web/${paintings[i].filename}`;
     // decode() offloads image decoding off the main thread, avoiding GPU stalls
     img.decode().then(() => {
       pendingUploads.push({ entry, tex, img });
@@ -981,13 +1074,14 @@ async function init() {
   // Panel toggle
   const panel = document.getElementById('panel');
   const panelHint = document.getElementById('panelHint');
-  let panelOpen = false;
   window.addEventListener('keydown', (e) => {
     if (e.key === 's' || e.key === 'S') {
       if (e.metaKey || e.ctrlKey) return; // don't hijack save
       panelOpen = !panelOpen;
       panel.classList.toggle('open', panelOpen);
+      document.body.classList.toggle('panel-open', panelOpen);
       panelHint.style.opacity = panelOpen ? '0' : '1';
+      resize();
       e.preventDefault();
     }
   });
@@ -1097,8 +1191,17 @@ async function init() {
     const ci = ((currentIndex % total) + total) % total;
     const ni = (((currentIndex + 1) % total) + total) % total;
     const curTex = texCache[ci] || loadTexture(ci);
-    const nxtTexRaw = texCache[ni] || loadTexture(ni);
-    const nxtTex = nxtTexRaw.ready ? nxtTexRaw : curTex;
+
+    // Black burn: every N-th transition uses black placeholder as next image
+    const burnN = Math.round(S.blackBurnEvery);
+    const isBlackBurn = burnN > 0 && (currentIndex + 1) % burnN === 0;
+    let nxtTex;
+    if (isBlackBurn) {
+      nxtTex = blackEntry;
+    } else {
+      const nxtTexRaw = texCache[ni] || loadTexture(ni);
+      nxtTex = nxtTexRaw.ready ? nxtTexRaw : curTex;
+    }
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, curTex.tex);
@@ -1135,7 +1238,10 @@ async function init() {
     gl.uniform1f(U.uWarpSpeed, S.warpSpeed);
     gl.uniform1f(U.uBleedAmt, S.bleed);
     gl.uniform1f(U.uRevealSpeed, S.revealSpeed);
+    gl.uniform1f(U.uRevealZoom, S.revealZoom);
     gl.uniform1f(U.uChannelSplit, S.channelSplit);
+    gl.uniform1f(U.uEdgeGlow, S.edgeGlow);
+    gl.uniform1f(U.uEdgeDarken, S.edgeDarken);
     gl.uniform1f(U.uZoomPow, S.zoomPow);
     gl.uniform1f(U.uBarrelAmt, S.barrel);
     gl.uniform1f(U.uParallaxAmt, S.parallax);
