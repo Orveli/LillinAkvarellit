@@ -183,11 +183,11 @@
   <div class="ctrl"><label>Scroll-nopeus</label><input type="range" id="sSpeed" min="0.0002" max="0.005" step="0.0001" value="0.001"><span class="val"></span></div>
   <div class="ctrl"><label>Lerp (smooth)</label><input type="range" id="sLerp" min="0.01" max="0.25" step="0.005" value="0.06"><span class="val"></span></div>
   <div class="ctrl"><label>Noise-skaala</label><input type="range" id="sNoiseScale" min="0.5" max="12" step="0.1" value="3.5"><span class="val"></span></div>
-  <div class="ctrl"><label>Noise-nopeus</label><input type="range" id="sNoiseSpeed" min="0" max="2" step="0.05" value="0.3"><span class="val"></span></div>
+  <div class="ctrl"><label>Noise-nopeus</label><input type="range" id="sNoiseSpeed" min="0" max="0.4" step="0.005" value="0.3"><span class="val"></span></div>
   <div class="ctrl"><label>Noise-määrä</label><input type="range" id="sNoiseAmp" min="0" max="0.4" step="0.005" value="0.1"><span class="val"></span></div>
   <div class="ctrl"><label>Reuna-feather</label><input type="range" id="sFeather" min="0.01" max="0.3" step="0.005" value="0.06"><span class="val"></span></div>
   <div class="ctrl"><label>Radius-kerroin</label><input type="range" id="sRadius" min="0.8" max="2.0" step="0.05" value="1.3"><span class="val"></span></div>
-  <div class="ctrl"><label>Next-aloituskoko</label><input type="range" id="sNextScale" min="0.01" max="0.5" step="0.01" value="0.08"><span class="val"></span></div>
+<div class="ctrl"><label>Next-aloituskoko</label><input type="range" id="sNextScale" min="0.01" max="0.5" step="0.01" value="0.08"><span class="val"></span></div>
 
   <h2>Zoom</h2>
   <div class="ctrl"><label>Zoom-teho</label><input type="range" id="sZoomPow" min="1.5" max="40" step="0.5" value="7"><span class="val"></span></div>
@@ -359,6 +359,7 @@ void main() {
   // Don't reveal next image where it hasn't scaled up yet
   float edgeDist = min(min(nUv.x, 1.0 - nUv.x), min(nUv.y, 1.0 - nUv.y));
   float nextCoverage = smoothstep(-0.03, 0.05, edgeDist);
+  nextCoverage = max(nextCoverage, smoothstep(0.92, 0.99, p));
   float maskedBoundary = mix(1.0, boundary, nextCoverage);
 
   // ---- Mix ----
