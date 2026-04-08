@@ -152,7 +152,7 @@
     margin: 0.8rem 0 0.3rem;
     height: 4px; background: #1a1714; border-radius: 2px; overflow: hidden;
   }
-  #progFill { height: 100%; background: #c8b8a4; width: 0%; transition: width 0.05s; }
+  #progFill { height: 100%; background: #c8b8a4; width: 0%; }
 
   /* Toggle button hint */
   #panelHint {
@@ -188,6 +188,7 @@
     <select id="sTransMode" style="flex:1;background:#1a1714;color:#c8b8a4;border:1px solid #2a2420;border-radius:3px;padding:3px 6px;font-size:10px;font-family:-apple-system,system-ui,sans-serif;cursor:pointer;">
       <option value="0">Radiaalinen</option>
       <option value="1">Akvarelli-bleed</option>
+      <option value="2">Kuva-reveal</option>
     </select>
   </div>
   <div class="ctrl"><label>Reuna-feather</label><input type="range" id="sFeather" min="0.01" max="0.3" step="0.005" value="0.06"><span class="val"></span></div>
@@ -205,6 +206,11 @@
     <div class="ctrl"><label>Warp-voimakkuus</label><input type="range" id="sWarpIntensity" min="0.05" max="0.8" step="0.01" value="0.3"><span class="val"></span></div>
     <div class="ctrl"><label>Warp-nopeus</label><input type="range" id="sWarpSpeed" min="0" max="0.5" step="0.005" value="0.12"><span class="val"></span></div>
     <div class="ctrl"><label>Värivuoto</label><input type="range" id="sBleed" min="0" max="0.05" step="0.001" value="0.015"><span class="val"></span></div>
+  </div>
+
+  <div id="revealControls" style="display:none">
+    <div class="ctrl"><label>Reveal-nopeus</label><input type="range" id="sRevealSpeed" min="0.2" max="1.0" step="0.01" value="0.55"><span class="val"></span></div>
+    <div class="ctrl"><label>Kanavasplit</label><input type="range" id="sChannelSplit" min="0" max="1.0" step="0.01" value="0"><span class="val"></span></div>
   </div>
 
   <h2>Zoom & liike</h2>
@@ -231,7 +237,10 @@
   <h2>Transition Curve</h2>
   <div id="curveWrap"><canvas id="curveCanvas"></canvas></div>
   <p class="hint">Vedä pisteitä muokataksesi easingia</p>
-  <button id="btnResetCurve" style="width:100%;margin-top:0.4rem;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">RESET CURVE</button>
+  <div style="display:flex;gap:6px;margin-top:0.4rem;">
+    <button id="btnResetCurve" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">RESET CURVE</button>
+    <button id="btnLinearCurve" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">LINEAARINEN</button>
+  </div>
 
   <div class="panel-btns">
     <button id="btnSave">TALLENNA</button>
@@ -256,12 +265,14 @@ varying vec2 vUv;
 
 uniform sampler2D uCurrent;
 uniform sampler2D uNext;
+uniform sampler2D uReveal;
 uniform float uProgress;
 uniform vec2 uMouse;
 uniform float uTime;
 uniform vec2 uResolution;
 uniform vec2 uCurrentSize;
 uniform vec2 uNextSize;
+uniform vec2 uRevealSize;
 
 // Tweakable uniforms
 uniform float uNoiseScale;
@@ -281,11 +292,19 @@ uniform float uGlowAmt;     // 0 = off
 uniform float uColorGrade;  // 0 = off, 1 = on
 
 // Watercolor transition
-uniform float uTransitionMode; // 0 = radial, 1 = watercolor
+uniform float uTransitionMode; // 0 = radial, 1 = watercolor, 2 = image reveal
 uniform float uWarpScale;
 uniform float uWarpIntensity;
 uniform float uWarpSpeed;
 uniform float uBleedAmt;
+
+// Image reveal
+uniform float uRevealSpeed;    // pow exponent for reveal progress (< 1 = faster reveal)
+uniform float uChannelSplit;   // 0 = pure luma, >0 = per-channel offset
+
+// Scroll-based zoom drift & next image spawn offset
+uniform vec2 uZoomDrift;
+uniform vec2 uNextOffset;
 
 // ---- Simplex noise ----
 vec3 mod289(vec3 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
@@ -339,13 +358,14 @@ void main() {
   float bAmt = -uBarrelAmt * p;
   vec2 curDistUv = barrel(uv, bAmt);
   float zoomFactor = 1.0 + (uZoomPow - 1.0) * p;
-  vec2 zoomCenter = vec2(0.5) + mOff * uZoomMouse * p;
+  vec2 zoomCenter = vec2(0.5) + mOff * uZoomMouse * p + uZoomDrift * p;
   vec2 currentUv = (curDistUv - zoomCenter) / zoomFactor + zoomCenter;
   currentUv += parallax * (1.0 - p);
 
-  // ---- Next image: clean ----
+  // ---- Next image: spawn from offset, transition to center ----
   float nextScale = uNextStartScale + p * (1.0 - uNextStartScale);
-  vec2 nextUv = (uv - 0.5) / nextScale + 0.5;
+  vec2 nextCenter = vec2(0.5) + uNextOffset * (1.0 - p) * (1.0 - p);
+  vec2 nextUv = (uv - nextCenter) / nextScale + nextCenter;
   nextUv += parallax * p;
 
   vec2 cUv = coverUv(currentUv, uCurrentSize, uResolution);
@@ -355,6 +375,8 @@ void main() {
   vec2 fromCenter = uv - 0.5;
   float dist = length(fromCenter);
   float boundary;
+  float boundaryR = -1.0;
+  float boundaryB = -1.0;
 
   if (uTransitionMode < 0.5) {
     // === Radial noise mode (original) ===
@@ -363,7 +385,7 @@ void main() {
     float radius = p * uRadiusMult;
     float feath = uFeather + p * uFeather;
     boundary = smoothstep(radius - feath, radius + feath, dist + n);
-  } else {
+  } else if (uTransitionMode < 1.5) {
     // === Watercolor bleed mode ===
     // Domain warping: noise(pos + noise(pos + noise(pos)))
     float t = uTime * uWarpSpeed;
@@ -402,6 +424,42 @@ void main() {
     // Recompute cover UVs with bleed
     cUv = coverUv(currentUv, uCurrentSize, uResolution);
     nUv = coverUv(nextUv, uNextSize, uResolution);
+  } else {
+    // === Image reveal mode ===
+    // Remap progress so reveal runs ahead of other effects
+    float rp = pow(p, uRevealSpeed);
+
+    // Warp the reveal texture sampling UVs so the pattern breathes
+    vec2 rUv = coverUv(uv, uRevealSize, uResolution);
+    float t = uTime * uWarpSpeed;
+    vec2 warpedRUv = rUv;
+    if (uWarpIntensity > 0.001) {
+      vec2 rCenter = rUv - 0.5;
+      vec2 q = vec2(
+        snoise(rCenter * uWarpScale + vec2(0.0, t * 0.3)),
+        snoise(rCenter * uWarpScale + vec2(5.2, t * 0.2 + 1.3))
+      );
+      vec2 r = vec2(
+        snoise((rCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(1.7 - t * 0.15, 9.2)),
+        snoise((rCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(8.3, 2.8 + t * 0.12))
+      );
+      warpedRUv = rUv + uWarpIntensity * (q * 0.6 + r * 0.4) * 0.15;
+    }
+    vec3 revealRGB = texture2D(uReveal, clamp(warpedRUv, 0.0, 1.0)).rgb;
+    float feath = uFeather + rp * uFeather * 0.5;
+
+    float luma = dot(revealRGB, vec3(0.299, 0.587, 0.114));
+    boundary = smoothstep(rp - feath, rp + feath, luma);
+
+    // Channel split: offset reveal UV per channel for chromatic fringe at edge
+    if (uChannelSplit > 0.001) {
+      float edgeAmt = boundary * (1.0 - boundary) * 4.0; // only at transition edge
+      vec2 splitOffset = edgeAmt * uChannelSplit * vec2(0.08, 0.04);
+      float lumaR = dot(texture2D(uReveal, clamp(warpedRUv + splitOffset, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+      float lumaB = dot(texture2D(uReveal, clamp(warpedRUv - splitOffset, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+      boundaryR = smoothstep(rp - feath, rp + feath, lumaR);
+      boundaryB = smoothstep(rp - feath, rp + feath, lumaB);
+    }
   }
 
   // ---- Sample current ----
@@ -427,10 +485,21 @@ void main() {
   float edgeDist = min(min(nUv.x, 1.0 - nUv.x), min(nUv.y, 1.0 - nUv.y));
   float nextCoverage = smoothstep(-0.03, 0.05, edgeDist);
   nextCoverage = max(nextCoverage, smoothstep(0.92, 0.99, p));
-  float maskedBoundary = mix(1.0, boundary, nextCoverage);
 
   // ---- Mix ----
-  vec3 col = mix(nxtCol, curCol, maskedBoundary);
+  float maskedBoundary = mix(1.0, boundary, nextCoverage);
+  vec3 col;
+  if (boundaryR >= 0.0) {
+    // Per-channel boundary for chromatic fringe
+    float mR = mix(1.0, boundaryR, nextCoverage);
+    float mG = maskedBoundary;
+    float mB = mix(1.0, boundaryB, nextCoverage);
+    col.r = mix(nxtCol.r, curCol.r, mR);
+    col.g = mix(nxtCol.g, curCol.g, mG);
+    col.b = mix(nxtCol.b, curCol.b, mB);
+  } else {
+    col = mix(nxtCol, curCol, maskedBoundary);
+  }
 
   // ---- Mouse glow ----
   if (uGlowAmt > 0.0) {
@@ -468,6 +537,8 @@ const DEFAULTS = {
   noiseAmp: 0.1, feather: 0.06, radius: 1.3, nextScale: 0.08,
   transMode: 0,
   warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
+  revealSpeed: 0.55,
+  channelSplit: 0,
   zoomPow: 7, barrel: 0.15, parallax: 0.015, zoomMouse: 0.06,
   aber: 0.015, aberOn: true, vig: 0.55, vigOn: true,
   grain: 0.025, grainOn: true, glow: 0.25, glowOn: true, colorOn: true,
@@ -687,6 +758,16 @@ function initCurveEditor() {
     Object.assign(curve, CURVE_DEFAULTS);
   });
 
+  // Linear curve button
+  document.getElementById('btnLinearCurve').addEventListener('click', () => {
+    Object.assign(curve, {
+      x1: 0.33, y1: 0.33,
+      mx: 0.5, my: 0.5,
+      mhx: 0.33, mhy: 0.33,
+      x2: 0.67, y2: 0.67,
+    });
+  });
+
   return draw;
 }
 
@@ -698,6 +779,8 @@ function bindSliders() {
     sRadius: 'radius', sNextScale: 'nextScale',
     sWarpScale: 'warpScale', sWarpIntensity: 'warpIntensity',
     sWarpSpeed: 'warpSpeed', sBleed: 'bleed',
+    sRevealSpeed: 'revealSpeed',
+    sChannelSplit: 'channelSplit',
     sZoomPow: 'zoomPow',
     sBarrel: 'barrel', sParallax: 'parallax', sZoomMouse: 'zoomMouse',
     sAber: 'aber', sVig: 'vig', sGrain: 'grain', sGlow: 'glow',
@@ -707,10 +790,12 @@ function bindSliders() {
   const modeSelect = document.getElementById('sTransMode');
   const radialDiv = document.getElementById('radialControls');
   const waterDiv = document.getElementById('watercolorControls');
+  const revealDiv = document.getElementById('revealControls');
   modeSelect.value = S.transMode;
   function updateModeUI() {
     radialDiv.style.display = S.transMode === 0 ? '' : 'none';
-    waterDiv.style.display = S.transMode === 1 ? '' : 'none';
+    waterDiv.style.display = (S.transMode === 1 || S.transMode === 2) ? '' : 'none';
+    revealDiv.style.display = S.transMode === 2 ? '' : 'none';
   }
   updateModeUI();
   modeSelect.addEventListener('change', () => {
@@ -818,41 +903,71 @@ async function init() {
 
   // All uniform locations
   const U = {};
-  ['uCurrent','uNext','uProgress','uMouse','uTime','uResolution','uCurrentSize','uNextSize',
+  ['uCurrent','uNext','uReveal','uProgress','uMouse','uTime','uResolution','uCurrentSize','uNextSize','uRevealSize',
    'uNoiseScale','uNoiseSpeed','uNoiseAmp','uFeather','uRadiusMult','uNextStartScale',
    'uTransitionMode','uWarpScale','uWarpIntensity','uWarpSpeed','uBleedAmt',
+   'uRevealSpeed','uChannelSplit',
    'uZoomPow','uBarrelAmt','uParallaxAmt','uZoomMouse',
-   'uAberAmt','uVigDark','uGrainAmt','uGlowAmt','uColorGrade'
+   'uAberAmt','uVigDark','uGrainAmt','uGlowAmt','uColorGrade',
+   'uZoomDrift','uNextOffset'
   ].forEach(name => { U[name] = gl.getUniformLocation(prog, name); });
 
   // Texture loading
   const texCache = {};
+  // Queue of decoded images waiting to be uploaded to GPU (one per frame to avoid stalls)
+  const pendingUploads = [];
+
   function loadTexture(idx) {
     const i = ((idx % total) + total) % total;
     if (texCache[i]) return texCache[i];
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([10,9,8,255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     const entry = { tex, width: 1, height: 1, ready: false };
     texCache[i] = entry;
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => {
+    img.src = `akvarellit/${paintings[i].filename}`;
+    // decode() offloads image decoding off the main thread, avoiding GPU stalls
+    img.decode().then(() => {
+      pendingUploads.push({ entry, tex, img });
+    }).catch(() => {
+      // Fallback for browsers without decode support
+      pendingUploads.push({ entry, tex, img });
+    });
+    return entry;
+  }
+
+  // Upload at most N pending textures per frame to spread GPU cost
+  function processPendingUploads(maxPerFrame) {
+    const count = Math.min(pendingUploads.length, maxPerFrame);
+    for (let i = 0; i < count; i++) {
+      const { entry, tex, img } = pendingUploads.shift();
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       entry.width = img.naturalWidth; entry.height = img.naturalHeight; entry.ready = true;
-    };
-    img.src = `akvarellit/${paintings[i].filename}`;
-    return entry;
+    }
+  }
+
+  // Pick a reveal texture index for each transition pair
+  // Use a shuffled offset so each transition gets a unique painting
+  function pickRevealIndex(ci, ni) {
+    // Pick an image that's neither current nor next
+    let ri = (ci + 3) % total;
+    if (ri === ci || ri === ni) ri = (ri + 1) % total;
+    if (ri === ci || ri === ni) ri = (ri + 1) % total;
+    return ri;
   }
 
   [0,1,2,3].forEach(i => loadTexture(i));
   await new Promise(resolve => {
     const check = () => {
+      // Process all pending uploads during loading (no frame budget needed yet)
+      processPendingUploads(pendingUploads.length);
       if (texCache[0]?.ready && texCache[1]?.ready) resolve();
       else setTimeout(check, 50);
     }; check();
@@ -877,6 +992,20 @@ async function init() {
     }
   });
 
+  // Per-image deterministic offsets (golden angle distribution)
+  function getSpawnOffset(index) {
+    const angle = index * 2.399963; // golden angle
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const maxR = isPortrait ? 0.12 : 0.22;
+    const r = maxR * (0.6 + 0.4 * Math.abs(Math.sin(index * 1.7)));
+    return [Math.cos(angle) * r, Math.sin(angle) * r];
+  }
+  function getZoomDrift(index) {
+    const angle = index * 3.883222 + 1.2; // different sequence
+    const r = 0.04 + 0.02 * Math.abs(Math.cos(index * 2.3));
+    return [Math.cos(angle) * r, Math.sin(angle) * r];
+  }
+
   // State
   let currentIndex = 0;
   let progress = 0, targetProgress = 0;
@@ -891,7 +1020,11 @@ async function init() {
   window.addEventListener('wheel', (e) => {
     if (panelOpen && e.target.closest('#panel')) return; // allow panel scroll
     e.preventDefault();
-    targetProgress += e.deltaY * S.speed;
+    // Normalize deltaY across browsers/devices (line vs pixel vs page mode)
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 40;      // DOM_DELTA_LINE → pixels
+    else if (e.deltaMode === 2) dy *= 800; // DOM_DELTA_PAGE → pixels
+    targetProgress += dy * S.speed;
     if (currentIndex === 0 && targetProgress < 0) targetProgress = 0;
     if (currentIndex >= total - 2 && targetProgress > 1) targetProgress = 1;
   }, { passive: false });
@@ -923,20 +1056,35 @@ async function init() {
 
   // Render
   const startTime = performance.now();
+  let lastFrame = performance.now();
 
-  function render() {
+  let prevCounterText = '';
+  let prevProgWidth = '';
+
+  function render(now) {
     requestAnimationFrame(render);
 
-    progress += (targetProgress - progress) * S.lerp;
-    if (Math.abs(targetProgress - progress) < 0.0005) progress = targetProgress;
+    // Upload pending textures (max 1 per frame to avoid GPU stalls)
+    processPendingUploads(1);
 
-    smoothMouseX += (mouseX - smoothMouseX) * 0.05;
-    smoothMouseY += (mouseY - smoothMouseY) * 0.05;
+    // Frame-rate independent lerp
+    const dt = Math.min((now - lastFrame) / 1000, 0.05); // cap at 50ms to avoid jumps after tab switch
+    lastFrame = now;
+    const lerpFactor = 1 - Math.pow(1 - S.lerp, dt * 60); // normalize to 60fps baseline
 
-    if (progress > 0.999 && targetProgress >= 1.0 && currentIndex < total - 2) {
+    progress += (targetProgress - progress) * lerpFactor;
+    if (Math.abs(targetProgress - progress) < 0.00001) progress = targetProgress;
+
+    const mouseLerp = 1 - Math.pow(0.95, dt * 60);
+    smoothMouseX += (mouseX - smoothMouseX) * mouseLerp;
+    smoothMouseY += (mouseY - smoothMouseY) * mouseLerp;
+
+    // Proactive preloading: keep textures loaded ahead of scroll position
+    loadTexture(currentIndex + 2); loadTexture(currentIndex + 3);
+
+    if (progress >= 1.0 && targetProgress >= 1.0 && currentIndex < total - 2) {
       currentIndex++; progress -= 1.0; targetProgress -= 1.0;
-      loadTexture(currentIndex + 2); loadTexture(currentIndex + 3);
-    } else if (progress < 0.001 && targetProgress <= 0.0 && currentIndex > 0) {
+    } else if (progress <= 0.0 && targetProgress <= 0.0 && currentIndex > 0) {
       currentIndex--; progress += 1.0; targetProgress += 1.0;
     }
     progress = Math.max(0, Math.min(1, progress));
@@ -949,7 +1097,8 @@ async function init() {
     const ci = ((currentIndex % total) + total) % total;
     const ni = (((currentIndex + 1) % total) + total) % total;
     const curTex = texCache[ci] || loadTexture(ci);
-    const nxtTex = texCache[ni] || loadTexture(ni);
+    const nxtTexRaw = texCache[ni] || loadTexture(ni);
+    const nxtTex = nxtTexRaw.ready ? nxtTexRaw : curTex;
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, curTex.tex);
@@ -957,6 +1106,14 @@ async function init() {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, nxtTex.tex);
     gl.uniform1i(U.uNext, 1);
+
+    // Reveal texture (third painting for image-reveal mode)
+    const ri = pickRevealIndex(ci, ni);
+    const revTex = texCache[ri] || loadTexture(ri);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, revTex.tex);
+    gl.uniform1i(U.uReveal, 2);
+    gl.uniform2f(U.uRevealSize, revTex.width, revTex.height);
 
     gl.uniform1f(U.uProgress, curvedP);
     gl.uniform2f(U.uMouse, smoothMouseX, smoothMouseY);
@@ -977,6 +1134,8 @@ async function init() {
     gl.uniform1f(U.uWarpIntensity, S.warpIntensity);
     gl.uniform1f(U.uWarpSpeed, S.warpSpeed);
     gl.uniform1f(U.uBleedAmt, S.bleed);
+    gl.uniform1f(U.uRevealSpeed, S.revealSpeed);
+    gl.uniform1f(U.uChannelSplit, S.channelSplit);
     gl.uniform1f(U.uZoomPow, S.zoomPow);
     gl.uniform1f(U.uBarrelAmt, S.barrel);
     gl.uniform1f(U.uParallaxAmt, S.parallax);
@@ -987,11 +1146,19 @@ async function init() {
     gl.uniform1f(U.uGlowAmt, S.glowOn ? S.glow : 0.0);
     gl.uniform1f(U.uColorGrade, S.colorOn ? 1.0 : 0.0);
 
+    // Per-image zoom drift and spawn offset
+    const drift = getZoomDrift(ci);
+    gl.uniform2f(U.uZoomDrift, drift[0], drift[1]);
+    const spawn = getSpawnOffset(ni);
+    gl.uniform2f(U.uNextOffset, spawn[0], spawn[1]);
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    // UI updates
-    counterEl.textContent = `${currentIndex + 1} / ${total}`;
-    progFill.style.width = (progress * 100) + '%';
+    // UI updates (only write DOM when values change)
+    const counterText = `${currentIndex + 1} / ${total}`;
+    if (counterText !== prevCounterText) { counterEl.textContent = counterText; prevCounterText = counterText; }
+    const progWidth = (progress * 100).toFixed(1) + '%';
+    if (progWidth !== prevProgWidth) { progFill.style.width = progWidth; prevProgWidth = progWidth; }
     if (panelOpen) drawCurve(progress);
   }
 
