@@ -57,9 +57,6 @@
   }
 
   /* ===== PANEL-OPEN LAYOUT SHIFT ===== */
-  canvas#c { transition: width 0.35s ease; }
-  body.panel-open canvas#c { width: calc(100% - 320px); }
-
   #title { transition: opacity 1.5s, right 0.35s ease; }
   body.panel-open #title { right: 320px; }
 
@@ -250,10 +247,13 @@
 
   <h2>Transition Curve</h2>
   <div id="curveWrap"><canvas id="curveCanvas"></canvas></div>
-  <p class="hint">Vedä pisteitä muokataksesi easingia</p>
+  <p class="hint">Vedä pisteitä muokataksesi easingia · vedä vihreä piste säätääksesi max-kohtaa</p>
+  <div class="toggle"><label>Keskipivotti</label><input type="checkbox" id="tMidEnabled" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
+  <div class="toggle"><label>Peilikulmat</label><input type="checkbox" id="tMirrorHandles"><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
   <div style="display:flex;gap:6px;margin-top:0.4rem;">
     <button id="btnResetCurve" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">RESET CURVE</button>
     <button id="btnLinearCurve" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">LINEAARINEN</button>
+    <button id="btnEarlyMax" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">EARLY MAX</button>
   </div>
 
   <div class="panel-btns">
@@ -281,6 +281,7 @@ uniform sampler2D uCurrent;
 uniform sampler2D uNext;
 uniform sampler2D uReveal;
 uniform float uProgress;
+uniform float uLinearProgress;
 uniform vec2 uMouse;
 uniform float uTime;
 uniform vec2 uResolution;
@@ -368,20 +369,21 @@ vec2 barrel(vec2 uv, float amt) {
 void main() {
   vec2 uv = vUv;
   float p = clamp(uProgress, 0.0, 1.0);
+  float lp = clamp(uLinearProgress, 0.0, 1.0);
   vec2 mOff = (uMouse - 0.5);
   vec2 parallax = mOff * uParallaxAmt;
 
-  // ---- Current image: barrel + zoom ----
+  // ---- Current image: barrel (curved) + zoom (linear) ----
   float bAmt = -uBarrelAmt * p;
   vec2 curDistUv = barrel(uv, bAmt);
-  float zoomFactor = 1.0 + (uZoomPow - 1.0) * p;
-  vec2 zoomCenter = vec2(0.5) + mOff * uZoomMouse * p + uZoomDrift * p;
+  float zoomFactor = 1.0 + (uZoomPow - 1.0) * lp;
+  vec2 zoomCenter = vec2(0.5) + mOff * uZoomMouse * lp + uZoomDrift * lp;
   vec2 currentUv = (curDistUv - zoomCenter) / zoomFactor + zoomCenter;
   currentUv += parallax * (1.0 - p);
 
-  // ---- Next image: spawn from offset, transition to center ----
-  float nextScale = uNextStartScale + p * (1.0 - uNextStartScale);
-  vec2 nextCenter = vec2(0.5) + uNextOffset * (1.0 - p) * (1.0 - p);
+  // ---- Next image: spawn from offset, zoom (linear) ----
+  float nextScale = uNextStartScale + lp * (1.0 - uNextStartScale);
+  vec2 nextCenter = vec2(0.5) + uNextOffset * (1.0 - lp) * (1.0 - lp);
   vec2 nextUv = (uv - nextCenter) / nextScale + nextCenter;
   nextUv += parallax * p;
 
@@ -602,6 +604,9 @@ const CURVE_DEFAULTS = {
   mx: 0.5, my: 0.5,        // mid point (on curve)
   mhx: 0.35, mhy: 0.5,     // mid handle (left side; right side is mirrored)
   x2: 0.8, y2: 1.0,        // handle for end (1,1)
+  endX: 1.0,               // x where curve reaches max (1.0 = normal end)
+  midEnabled: true,         // mid pivot point enabled
+  mirrorHandles: false,     // mirror cp1 ↔ cp2
 };
 
 const STORAGE_KEY = 'lillinAkvarellit_settings';
@@ -661,13 +666,24 @@ function solveT(x, xp0, xp1, xp2, xp3) {
 function applyCurve(x) {
   if (x <= 0) return 0;
   if (x >= 1) return 1;
+  const eX = curve.endX;
+  // Past endX → already at max
+  if (eX < 1 && x >= eX) return 1;
+  // Remap x into 0..endX → 0..1 for curve evaluation
+  const rx = eX < 1 ? x / eX : x;
+
+  if (!curve.midEnabled) {
+    // Single cubic segment: (0,0) → (x1,y1) → (x2,y2) → (1,1)
+    const t = solveT(rx, 0, curve.x1, curve.x2, 1);
+    return cubicB(t, 0, curve.y1, curve.y2, 1);
+  }
   const mhxR = 2 * curve.mx - curve.mhx;
   const mhyR = 2 * curve.my - curve.mhy;
-  if (x <= curve.mx) {
-    const t = solveT(x, 0, curve.x1, curve.mhx, curve.mx);
+  if (rx <= curve.mx) {
+    const t = solveT(rx, 0, curve.x1, curve.mhx, curve.mx);
     return cubicB(t, 0, curve.y1, curve.mhy, curve.my);
   } else {
-    const t = solveT(x, curve.mx, mhxR, curve.x2, 1);
+    const t = solveT(rx, curve.mx, mhxR, curve.x2, 1);
     return cubicB(t, curve.my, mhyR, curve.y2, 1);
   }
 }
@@ -700,6 +716,7 @@ function initCurveEditor() {
     ctx.clearRect(0, 0, W, H);
     const mhxR = 2 * curve.mx - curve.mhx;
     const mhyR = 2 * curve.my - curve.mhy;
+    const eX = curve.endX;
 
     // Grid
     ctx.strokeStyle = '#1e1c1a';
@@ -719,51 +736,91 @@ function initCurveEditor() {
     ctx.beginPath(); ctx.moveTo(dx0, dy0); ctx.lineTo(dx1, dy1); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw two bezier segments
+    // endX marker line
+    if (eX < 0.999) {
+      ctx.strokeStyle = '#5a6a4a';
+      ctx.setLineDash([4, 4]);
+      const [ex] = toScreen(eX, 0);
+      ctx.beginPath(); ctx.moveTo(ex, pad); ctx.lineTo(ex, pad + gh); ctx.stroke();
+      ctx.setLineDash([]);
+      // Flat region after endX
+      ctx.strokeStyle = 'rgba(90,106,74,0.4)';
+      ctx.lineWidth = 2;
+      const [fsx, fsy] = toScreen(eX, 1);
+      const [fex, fey] = toScreen(1, 1);
+      ctx.beginPath(); ctx.moveTo(fsx, fsy); ctx.lineTo(fex, fey); ctx.stroke();
+    }
+
+    // Draw curve
     ctx.strokeStyle = '#c8b8a4';
     ctx.lineWidth = 2;
     ctx.beginPath();
     const [sx, sy] = toScreen(0, 0);
     ctx.moveTo(sx, sy);
-    // Segment 1: (0,0) → (x1,y1) → (mhx,mhy) → (mx,my)
-    for (let i = 1; i <= 40; i++) {
-      const t = i / 40;
-      const bx = cubicB(t, 0, curve.x1, curve.mhx, curve.mx);
-      const by = cubicB(t, 0, curve.y1, curve.mhy, curve.my);
-      const [px, py] = toScreen(bx, by);
-      ctx.lineTo(px, py);
-    }
-    // Segment 2: (mx,my) → (mhxR,mhyR) → (x2,y2) → (1,1)
-    for (let i = 1; i <= 40; i++) {
-      const t = i / 40;
-      const bx = cubicB(t, curve.mx, mhxR, curve.x2, 1);
-      const by = cubicB(t, curve.my, mhyR, curve.y2, 1);
-      const [px, py] = toScreen(bx, by);
-      ctx.lineTo(px, py);
+
+    if (!curve.midEnabled) {
+      // Single segment: (0,0) → (x1,y1) → (x2,y2) → (endX,1)
+      for (let i = 1; i <= 80; i++) {
+        const t = i / 80;
+        const bx = cubicB(t, 0, curve.x1, curve.x2, eX);
+        const by = cubicB(t, 0, curve.y1, curve.y2, 1);
+        const [px, py] = toScreen(bx, by);
+        ctx.lineTo(px, py);
+      }
+    } else {
+      // Segment 1: (0,0) → (x1,y1) → (mhx,mhy) → (mx*eX, my)
+      const mxS = curve.mx * eX;
+      for (let i = 1; i <= 40; i++) {
+        const t = i / 40;
+        const bx = cubicB(t, 0, curve.x1 * eX, curve.mhx * eX, mxS);
+        const by = cubicB(t, 0, curve.y1, curve.mhy, curve.my);
+        const [px, py] = toScreen(bx, by);
+        ctx.lineTo(px, py);
+      }
+      // Segment 2: (mx*eX, my) → (mhxR*eX, mhyR) → (x2*eX, y2) → (eX, 1)
+      for (let i = 1; i <= 40; i++) {
+        const t = i / 40;
+        const bx = cubicB(t, mxS, mhxR * eX, curve.x2 * eX, eX);
+        const by = cubicB(t, curve.my, mhyR, curve.y2, 1);
+        const [px, py] = toScreen(bx, by);
+        ctx.lineTo(px, py);
+      }
     }
     ctx.stroke();
 
     // Control lines
     ctx.strokeStyle = 'rgba(200,180,160,0.25)';
     ctx.lineWidth = 1;
-    const [c1x, c1y] = toScreen(curve.x1, curve.y1);
-    const [c2x, c2y] = toScreen(curve.x2, curve.y2);
-    const [msx, msy] = toScreen(curve.mx, curve.my);
-    const [mhsx, mhsy] = toScreen(curve.mhx, curve.mhy);
-    const [mhrx, mhry] = toScreen(mhxR, mhyR);
+    const [c1x, c1y] = toScreen(curve.midEnabled ? curve.x1 * eX : curve.x1 * eX, curve.y1);
+    const [c2x, c2y] = toScreen(curve.midEnabled ? curve.x2 * eX : curve.x2 * eX, curve.y2);
     ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(c1x, c1y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(...toScreen(1,1)); ctx.lineTo(c2x, c2y); ctx.stroke();
-    // Mid handle lines
-    ctx.beginPath(); ctx.moveTo(mhsx, mhsy); ctx.lineTo(msx, msy); ctx.lineTo(mhrx, mhry); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...toScreen(eX, 1)); ctx.lineTo(c2x, c2y); ctx.stroke();
 
-    // Control points
     const points = [
       { x: c1x, y: c1y, id: 'cp1', r: 5, col: '#c8b8a4' },
       { x: c2x, y: c2y, id: 'cp2', r: 5, col: '#c8b8a4' },
-      { x: mhsx, y: mhsy, id: 'mh', r: 4, col: '#8a9aaa' },
-      { x: mhrx, y: mhry, id: 'mh_mirror', r: 3, col: '#5a6a7a' },
-      { x: msx, y: msy, id: 'mid', r: 6, col: '#e8c888' },
     ];
+
+    if (curve.midEnabled) {
+      const mxS = curve.mx * eX;
+      const [msx, msy] = toScreen(mxS, curve.my);
+      const [mhsx, mhsy] = toScreen(curve.mhx * eX, curve.mhy);
+      const [mhrx, mhry] = toScreen(mhxR * eX, mhyR);
+      // Mid handle lines
+      ctx.beginPath(); ctx.moveTo(mhsx, mhsy); ctx.lineTo(msx, msy); ctx.lineTo(mhrx, mhry); ctx.stroke();
+      points.push(
+        { x: mhsx, y: mhsy, id: 'mh', r: 4, col: '#8a9aaa' },
+        { x: mhrx, y: mhry, id: 'mh_mirror', r: 3, col: '#5a6a7a' },
+        { x: msx, y: msy, id: 'mid', r: 6, col: '#e8c888' },
+      );
+    }
+
+    // endX handle
+    if (eX < 0.999) {
+      const [esx, esy] = toScreen(eX, 1);
+      points.push({ x: esx, y: esy, id: 'endX', r: 5, col: '#5a6a4a' });
+    }
+
     for (const pt of points) {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
@@ -785,12 +842,20 @@ function initCurveEditor() {
   function hitTest(sx, sy) {
     const mhxR = 2 * curve.mx - curve.mhx;
     const mhyR = 2 * curve.my - curve.mhy;
+    const eX = curve.endX;
     const pts = [
-      { s: toScreen(curve.mx, curve.my), id: 'mid' },
-      { s: toScreen(curve.mhx, curve.mhy), id: 'mh' },
-      { s: toScreen(curve.x1, curve.y1), id: 'cp1' },
-      { s: toScreen(curve.x2, curve.y2), id: 'cp2' },
+      { s: toScreen(curve.x1 * eX, curve.y1), id: 'cp1' },
+      { s: toScreen(curve.x2 * eX, curve.y2), id: 'cp2' },
     ];
+    if (curve.midEnabled) {
+      pts.unshift(
+        { s: toScreen(curve.mx * eX, curve.my), id: 'mid' },
+        { s: toScreen(curve.mhx * eX, curve.mhy), id: 'mh' },
+      );
+    }
+    if (eX < 0.999) {
+      pts.push({ s: toScreen(eX, 1), id: 'endX' });
+    }
     for (const p of pts) {
       if (Math.hypot(sx - p.s[0], sy - p.s[1]) < 14) return p.id;
     }
@@ -808,16 +873,34 @@ function initCurveEditor() {
     const [nx, ny] = fromScreen(e.clientX - r.left, e.clientY - r.top);
     const cx = Math.max(0, Math.min(1, nx));
     const cy = Math.max(0, Math.min(1, ny));
-    if (dragging === 'cp1') { curve.x1 = Math.min(cx, curve.mx); curve.y1 = cy; }
-    else if (dragging === 'cp2') { curve.x2 = Math.max(cx, curve.mx); curve.y2 = cy; }
-    else if (dragging === 'mid') {
-      const dx = cx - curve.mx, dy = cy - curve.my;
-      curve.mx = Math.max(0.05, Math.min(0.95, cx));
+    const eX = curve.endX;
+    // Convert screen x to normalized curve x (0..1 within the endX range)
+    const ncx = eX > 0.01 ? Math.max(0, Math.min(1, cx / eX)) : cx;
+
+    if (dragging === 'cp1') {
+      curve.x1 = curve.midEnabled ? Math.min(ncx, curve.mx) : Math.min(ncx, 1);
+      curve.y1 = cy;
+      if (curve.mirrorHandles) { curve.x2 = 1 - curve.x1; curve.y2 = 1 - curve.y1; }
+    }
+    else if (dragging === 'cp2') {
+      curve.x2 = curve.midEnabled ? Math.max(ncx, curve.mx) : Math.max(ncx, 0);
+      curve.y2 = cy;
+      if (curve.mirrorHandles) { curve.x1 = 1 - curve.x2; curve.y1 = 1 - curve.y2; }
+    }
+    else if (dragging === 'mid' && curve.midEnabled) {
+      const dx = ncx - curve.mx, dy = cy - curve.my;
+      curve.mx = Math.max(0.05, Math.min(0.95, ncx));
       curve.my = Math.max(0, Math.min(1, cy));
       curve.mhx = Math.max(0, Math.min(1, curve.mhx + dx));
       curve.mhy = Math.max(0, Math.min(1, curve.mhy + dy));
     }
-    else if (dragging === 'mh') { curve.mhx = Math.max(0, Math.min(curve.mx, cx)); curve.mhy = cy; }
+    else if (dragging === 'mh' && curve.midEnabled) {
+      curve.mhx = Math.max(0, Math.min(curve.mx, ncx));
+      curve.mhy = cy;
+    }
+    else if (dragging === 'endX') {
+      curve.endX = Math.max(0.15, Math.min(1, cx));
+    }
   });
 
   window.addEventListener('mouseup', () => { dragging = null; });
@@ -825,6 +908,8 @@ function initCurveEditor() {
   // Reset curve button
   document.getElementById('btnResetCurve').addEventListener('click', () => {
     Object.assign(curve, CURVE_DEFAULTS);
+    tMidEl.checked = curve.midEnabled;
+    tMirrorEl.checked = curve.mirrorHandles;
   });
 
   // Linear curve button
@@ -834,8 +919,24 @@ function initCurveEditor() {
       mx: 0.5, my: 0.5,
       mhx: 0.33, mhy: 0.33,
       x2: 0.67, y2: 0.67,
+      endX: 1.0,
     });
   });
+
+  // Early max button – sets endX to 0.7 so curve reaches max earlier
+  document.getElementById('btnEarlyMax').addEventListener('click', () => {
+    curve.endX = 0.7;
+  });
+
+  // Mid pivot toggle
+  const tMidEl = document.getElementById('tMidEnabled');
+  tMidEl.checked = curve.midEnabled;
+  tMidEl.addEventListener('change', () => { curve.midEnabled = tMidEl.checked; });
+
+  // Mirror handles toggle
+  const tMirrorEl = document.getElementById('tMirrorHandles');
+  tMirrorEl.checked = curve.mirrorHandles;
+  tMirrorEl.addEventListener('change', () => { curve.mirrorHandles = tMirrorEl.checked; });
 
   return draw;
 }
@@ -953,8 +1054,7 @@ async function init() {
 
   function resize() {
     const dpr = window.devicePixelRatio || 1;
-    const w = panelOpen ? window.innerWidth - 320 : window.innerWidth;
-    canvas.width = w * dpr;
+    canvas.width = window.innerWidth * dpr;
     canvas.height = window.innerHeight * dpr;
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
@@ -992,7 +1092,7 @@ async function init() {
    'uRevealSpeed','uRevealZoom','uChannelSplit','uEdgeGlow','uEdgeDarken',
    'uZoomPow','uBarrelAmt','uParallaxAmt','uZoomMouse',
    'uAberAmt','uVigDark','uGrainAmt','uGlowAmt','uColorGrade',
-   'uZoomDrift','uNextOffset'
+   'uZoomDrift','uNextOffset','uLinearProgress'
   ].forEach(name => { U[name] = gl.getUniformLocation(prog, name); });
 
   // Texture loading
@@ -1040,9 +1140,24 @@ async function init() {
     const count = Math.min(pendingUploads.length, maxPerFrame);
     for (let i = 0; i < count; i++) {
       const { entry, tex, img } = pendingUploads.shift();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      entry.width = img.naturalWidth; entry.height = img.naturalHeight; entry.ready = true;
+      uploadTexEntry(entry, tex, img);
+    }
+  }
+  function uploadTexEntry(entry, tex, img) {
+    if (entry.ready) return;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    entry.width = img.naturalWidth; entry.height = img.naturalHeight; entry.ready = true;
+  }
+  // Force-upload a specific texture if it's pending (skip the queue)
+  function ensureUploaded(texEntry) {
+    if (texEntry.ready) return;
+    for (let i = 0; i < pendingUploads.length; i++) {
+      if (pendingUploads[i].entry === texEntry) {
+        const { entry, tex, img } = pendingUploads.splice(i, 1)[0];
+        uploadTexEntry(entry, tex, img);
+        return;
+      }
     }
   }
 
@@ -1081,7 +1196,6 @@ async function init() {
       panel.classList.toggle('open', panelOpen);
       document.body.classList.toggle('panel-open', panelOpen);
       panelHint.style.opacity = panelOpen ? '0' : '1';
-      resize();
       e.preventDefault();
     }
   });
@@ -1159,7 +1273,7 @@ async function init() {
     requestAnimationFrame(render);
 
     // Upload pending textures (max 1 per frame to avoid GPU stalls)
-    processPendingUploads(1);
+    processPendingUploads(2);
 
     // Frame-rate independent lerp
     const dt = Math.min((now - lastFrame) / 1000, 0.05); // cap at 50ms to avoid jumps after tab switch
@@ -1191,6 +1305,7 @@ async function init() {
     const ci = ((currentIndex % total) + total) % total;
     const ni = (((currentIndex + 1) % total) + total) % total;
     const curTex = texCache[ci] || loadTexture(ci);
+    ensureUploaded(curTex);
 
     // Black burn: every N-th transition uses black placeholder as next image
     const burnN = Math.round(S.blackBurnEvery);
@@ -1200,6 +1315,7 @@ async function init() {
       nxtTex = blackEntry;
     } else {
       const nxtTexRaw = texCache[ni] || loadTexture(ni);
+      ensureUploaded(nxtTexRaw);
       nxtTex = nxtTexRaw.ready ? nxtTexRaw : curTex;
     }
 
@@ -1213,12 +1329,14 @@ async function init() {
     // Reveal texture (third painting for image-reveal mode)
     const ri = pickRevealIndex(ci, ni);
     const revTex = texCache[ri] || loadTexture(ri);
+    ensureUploaded(revTex);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, revTex.tex);
     gl.uniform1i(U.uReveal, 2);
     gl.uniform2f(U.uRevealSize, revTex.width, revTex.height);
 
     gl.uniform1f(U.uProgress, curvedP);
+    gl.uniform1f(U.uLinearProgress, progress);
     gl.uniform2f(U.uMouse, smoothMouseX, smoothMouseY);
     gl.uniform1f(U.uTime, (performance.now() - startTime) * 0.001);
     gl.uniform2f(U.uResolution, canvas.width, canvas.height);
