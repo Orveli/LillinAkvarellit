@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lillin Akvarellit</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Georgia', serif;
+            background: #d8d0c8;
+            padding: 1.5rem;
+        }
+        h1 { text-align: center; color: #4a3728; font-size: 2rem; margin-bottom: 0.25rem; }
+        .subtitle { text-align: center; color: #7a6558; margin-bottom: 1rem; font-size: 0.9rem; }
+
+        .save-bar {
+            max-width: 960px;
+            margin: 0 auto 1.5rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: center;
+        }
+        .save-bar button {
+            padding: 0.5rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: #4a3728;
+            color: white;
+        }
+        .save-bar button:hover { background: #5d4a3a; }
+        .save-bar .status { font-size: 0.8rem; color: #7a6558; }
+
+        .undo-bar {
+            max-width: 960px;
+            margin: 0 auto 1rem;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f5e6d0;
+            border: 1px solid #d4c0a8;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #4a3728;
+        }
+        .undo-bar.visible { display: flex; }
+        .undo-bar button {
+            padding: 0.35rem 0.9rem;
+            border: none;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            background: #7a6558;
+            color: white;
+        }
+        .undo-bar button:hover { background: #5d4a3a; }
+
+        .swap-bar {
+            max-width: 960px;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: #4a3728;
+        }
+        .swap-bar label { font-weight: bold; }
+        .swap-bar input[type="text"] {
+            width: 60px;
+            padding: 0.35rem 0.5rem;
+            border: 1px solid #c0b0a0;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            text-align: center;
+            background: white;
+        }
+        .swap-bar button {
+            padding: 0.35rem 0.9rem;
+            border: none;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: #4a3728;
+            color: white;
+        }
+        .swap-bar button:hover { background: #5d4a3a; }
+        .swap-bar .swap-status {
+            font-size: 0.75rem;
+            color: #a05050;
+            min-width: 120px;
+        }
+
+        /* Single A4 page (cover / back cover) */
+        .a4 {
+            position: relative;
+            aspect-ratio: 210 / 297;
+            background: white;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.842% 1.190%; /* 2.5mm */
+        }
+        .a4 img {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+
+        /* Cover: single centered page */
+        .cover-wrap {
+            max-width: 480px;
+            margin: 0 auto 1.5rem;
+        }
+
+        /* Spread: two A4 pages side by side */
+        .spread {
+            max-width: 960px;
+            margin: 0 auto 1.5rem;
+            display: flex;
+            gap: 0;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+        }
+        .spread .a4 {
+            flex: 1;
+            box-shadow: none;
+        }
+        .spread .a4.left { border-right: 1px solid #e0d8d0; }
+
+        /* Multi images (2 or 3 stacked on one A4 page) */
+        .a4.multi {
+            gap: 0.842%; /* 2.5mm */
+        }
+        .a4.multi .img-slot {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .a4.multi .img-slot img {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+
+        .layout-select {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            z-index: 6;
+            font-size: 0.65rem;
+            padding: 2px 4px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 3px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .a4:hover .layout-select { opacity: 1; }
+
+        /* Overlay & controls */
+        .overlay {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 5;
+        }
+        .a4:hover .overlay,
+        .img-slot:hover .overlay { opacity: 1; }
+
+        .id-tag {
+            position: absolute;
+            bottom: 3px;
+            left: 4px;
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .page select, .a4 select {
+            font-size: 0.65rem;
+            padding: 2px 4px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 3px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            cursor: pointer;
+        }
+        .swap-input {
+            width: 38px;
+            font-size: 0.6rem;
+            padding: 2px 3px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 3px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            text-align: center;
+        }
+        .swap-input::placeholder { color: rgba(255,255,255,0.5); }
+        .swap-btn {
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 3px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            cursor: pointer;
+        }
+        .swap-btn:hover { background: rgba(80,50,20,0.8); }
+        .remove-btn {
+            font-size: 0.55rem;
+            padding: 2px 5px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 3px;
+            background: rgba(180,50,50,0.7);
+            color: white;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .remove-btn:hover { background: rgba(200,30,30,0.9); }
+
+        .spread-label {
+            text-align: center;
+            color: #aaa;
+            font-size: 0.7rem;
+            margin: -1rem auto 1.5rem;
+            max-width: 960px;
+        }
+
+        @media print {
+            body { padding: 0; background: white; }
+            h1, .subtitle, .save-bar, .spread-label, .overlay, .undo-bar, .swap-bar, .layout-select { display: none !important; }
+            .cover-wrap, .spread { box-shadow: none; max-width: 100%; }
+            .a4 { box-shadow: none; break-after: page; height: 100vh; }
+            .spread { break-after: avoid; }
+        }
+        @media (max-width: 600px) {
+            body { padding: 0.5rem; }
+            h1 { font-size: 1.4rem; }
+            .spread { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Lillin Akvarellit</h1>
+<p class="subtitle" id="subtitle"></p>
+<div class="save-bar">
+    <button onclick="saveToFile()">Tallenna asetukset</button>
+    <span class="status" id="save-status"></span>
+</div>
+<div class="swap-bar">
+    <label>Vaihda:</label>
+    <input type="text" id="swap-a" placeholder="AKV-nro">
+    <span>&#8644;</span>
+    <input type="text" id="swap-b" placeholder="AKV-nro">
+    <button onclick="doGlobalSwap()">Vaihda</button>
+    <span class="swap-status" id="swap-status"></span>
+</div>
+<div class="undo-bar" id="undo-bar">
+    <span id="undo-text"></span>
+    <button onclick="undoRemove()">Kumoa</button>
+</div>
+<div id="book"></div>
+
+<script>
+const catalog = [
+{"id":"AKV-001","f":"IMG_0278.jpeg","w":2231,"h":3082},
+{"id":"AKV-002","f":"IMG_0317.jpeg","w":2416,"h":2461},
+{"id":"AKV-003","f":"IMG_0398.jpeg","w":2424,"h":3298},
+{"id":"AKV-004","f":"IMG_0426.jpeg","w":2312,"h":2750},
+{"id":"AKV-005","f":"IMG_0446.jpeg","w":2141,"h":2894},
+{"id":"AKV-006","f":"IMG_0461.jpeg","w":1982,"h":2168},
+{"id":"AKV-007","f":"IMG_0552.jpeg","w":1626,"h":2029},
+{"id":"AKV-008","f":"IMG_0765.jpeg","w":3346,"h":2622},
+{"id":"AKV-009","f":"IMG_0827.jpeg","w":1600,"h":2247},
+{"id":"AKV-010","f":"IMG_0831.jpeg","w":1595,"h":2485},
+{"id":"AKV-011","f":"IMG_0842.jpeg","w":1311,"h":1513},
+{"id":"AKV-012","f":"IMG_0845.jpeg","w":1545,"h":2272},
+{"id":"AKV-013","f":"IMG_0855.jpeg","w":1994,"h":2528},
+{"id":"AKV-014","f":"IMG_0945.jpeg","w":2478,"h":3339},
+{"id":"AKV-015","f":"IMG_0953.jpeg","w":3024,"h":3284},
+{"id":"AKV-016","f":"IMG_1007.jpeg","w":2333,"h":3128},
+{"id":"AKV-017","f":"IMG_1014.jpeg","w":1773,"h":2375},
+{"id":"AKV-018","f":"IMG_1017.jpeg","w":1402,"h":1796},
+{"id":"AKV-019","f":"IMG_1035.jpeg","w":2130,"h":1578},
+{"id":"AKV-020","f":"IMG_1072.jpeg","w":2895,"h":3642},
+{"id":"AKV-021","f":"IMG_1092.jpeg","w":2659,"h":3463},
+{"id":"AKV-022","f":"IMG_1108.jpeg","w":2247,"h":3017},
+{"id":"AKV-023","f":"IMG_1111.jpeg","w":2244,"h":3201},
+{"id":"AKV-024","f":"IMG_1123.jpeg","w":1565,"h":2949},
+{"id":"AKV-025","f":"IMG_1136.jpeg","w":2305,"h":3111},
+{"id":"AKV-026","f":"IMG_1158.jpeg","w":1816,"h":1458},
+{"id":"AKV-027","f":"IMG_1165.jpeg","w":750,"h":632},
+{"id":"AKV-028","f":"IMG_1169.jpeg","w":2256,"h":3168},
+{"id":"AKV-029","f":"IMG_1175.jpeg","w":2078,"h":2851},
+{"id":"AKV-030","f":"IMG_1183.jpeg","w":2427,"h":3195},
+{"id":"AKV-031","f":"IMG_1269.jpeg","w":2217,"h":2659},
+{"id":"AKV-032","f":"IMG_1281.jpeg","w":750,"h":988},
+{"id":"AKV-033","f":"IMG_1289.jpeg","w":2432,"h":3271},
+{"id":"AKV-034","f":"IMG_1314.jpeg","w":2236,"h":3134},
+{"id":"AKV-035","f":"IMG_1325.jpeg","w":3708,"h":2481},
+{"id":"AKV-036","f":"IMG_1326.jpeg","w":3372,"h":2147},
+{"id":"AKV-037","f":"IMG_1327.jpeg","w":1601,"h":2321},
+{"id":"AKV-038","f":"IMG_1328.jpeg","w":3200,"h":2204},
+{"id":"AKV-039","f":"IMG_1329.jpeg","w":3669,"h":2630},
+{"id":"AKV-040","f":"IMG_1340.jpeg","w":2316,"h":3174},
+{"id":"AKV-041","f":"IMG_1343.jpeg","w":2338,"h":1821},
+{"id":"AKV-042","f":"IMG_1355.jpeg","w":4032,"h":3024},
+{"id":"AKV-043","f":"IMG_1356.jpeg","w":2596,"h":3017},
+{"id":"AKV-044","f":"IMG_1359.jpeg","w":2657,"h":3581},
+{"id":"AKV-045","f":"IMG_1388.jpeg","w":1682,"h":1131},
+{"id":"AKV-046","f":"IMG_1391.jpeg","w":4032,"h":3024},
+{"id":"AKV-047","f":"IMG_1396.jpeg","w":2695,"h":2600},
+{"id":"AKV-048","f":"IMG_1397.jpeg","w":2772,"h":3471},
+{"id":"AKV-049","f":"IMG_1398.jpeg","w":2163,"h":2709},
+{"id":"AKV-050","f":"IMG_1400.jpeg","w":1929,"h":2759},
+{"id":"AKV-051","f":"IMG_1421.jpeg","w":2842,"h":1997},
+{"id":"AKV-052","f":"IMG_1430.JPG","w":2268,"h":2070},
+{"id":"AKV-053","f":"IMG_1450.jpeg","w":3228,"h":2248},
+{"id":"AKV-054","f":"IMG_1498.jpeg","w":2214,"h":2964},
+{"id":"AKV-055","f":"IMG_1513.jpeg","w":639,"h":957},
+{"id":"AKV-056","f":"IMG_1526.jpeg","w":3177,"h":2040},
+{"id":"AKV-057","f":"IMG_1585.JPG","w":3197,"h":2397},
+{"id":"AKV-058","f":"IMG_1586.JPG","w":2961,"h":2234},
+{"id":"AKV-059","f":"IMG_1599.jpeg","w":3289,"h":2116},
+{"id":"AKV-060","f":"IMG_1638.jpeg","w":2694,"h":3324},
+{"id":"AKV-061","f":"IMG_1662.jpeg","w":2872,"h":1941},
+{"id":"AKV-062","f":"IMG_2236.jpeg","w":2698,"h":3521},
+{"id":"AKV-063","f":"IMG_2237.jpeg","w":2879,"h":3568},
+{"id":"AKV-064","f":"IMG_2252.jpeg","w":2456,"h":3128},
+{"id":"AKV-065","f":"IMG_2262.JPG","w":2126,"h":2277},
+{"id":"AKV-066","f":"IMG_2264.JPG","w":2093,"h":3020},
+{"id":"AKV-067","f":"IMG_2345.JPG","w":2874,"h":1910},
+{"id":"AKV-068","f":"IMG_2409.jpeg","w":3175,"h":2200},
+{"id":"AKV-069","f":"IMG_2543.jpeg","w":4032,"h":3024},
+{"id":"AKV-070","f":"IMG_2545.jpeg","w":2596,"h":3601},
+{"id":"AKV-071","f":"IMG_2548.jpeg","w":2974,"h":2645},
+{"id":"AKV-072","f":"IMG_2549.jpeg","w":2807,"h":3789},
+{"id":"AKV-073","f":"IMG_2550.jpeg","w":4032,"h":3024},
+{"id":"AKV-074","f":"IMG_2555.jpeg","w":2881,"h":2784},
+{"id":"AKV-075","f":"IMG_2576.jpeg","w":2597,"h":3524},
+{"id":"AKV-076","f":"IMG_2615.jpeg","w":2807,"h":2079},
+{"id":"AKV-077","f":"IMG_2628.JPG","w":2160,"h":2872},
+{"id":"AKV-078","f":"IMG_2682.jpeg","w":2448,"h":3040},
+{"id":"AKV-079","f":"IMG_2688.jpeg","w":3023,"h":3873},
+{"id":"AKV-080","f":"IMG_2689.jpeg","w":3024,"h":4032},
+{"id":"AKV-081","f":"IMG_2691.jpeg","w":4032,"h":3024},
+{"id":"AKV-082","f":"IMG_2692.jpeg","w":2574,"h":2077},
+{"id":"AKV-083","f":"IMG_2740.jpeg","w":2314,"h":3358},
+{"id":"AKV-084","f":"IMG_2770.jpeg","w":2378,"h":3205},
+{"id":"AKV-085","f":"IMG_2771.jpeg","w":2574,"h":3078},
+{"id":"AKV-086","f":"IMG_2772.jpeg","w":4032,"h":3024},
+{"id":"AKV-087","f":"IMG_2781.jpeg","w":1819,"h":2315},
+{"id":"AKV-088","f":"IMG_2785.jpeg","w":1614,"h":2053},
+{"id":"AKV-089","f":"IMG_2804.jpeg","w":2242,"h":3355},
+{"id":"AKV-090","f":"IMG_2836.jpeg","w":2111,"h":3369},
+{"id":"AKV-091","f":"IMG_2838.jpeg","w":2850,"h":2080},
+{"id":"AKV-092","f":"IMG_2880.jpeg","w":2186,"h":1517},
+{"id":"AKV-093","f":"IMG_2881.jpeg","w":2310,"h":1627},
+{"id":"AKV-094","f":"IMG_2914.jpeg","w":1883,"h":2707},
+{"id":"AKV-095","f":"IMG_3086.JPG","w":1982,"h":2669},
+{"id":"AKV-096","f":"IMG_3469.JPG","w":2640,"h":1729},
+{"id":"AKV-097","f":"IMG_3656.JPG","w":2072,"h":3082},
+{"id":"AKV-098","f":"IMG_3657.JPG","w":2486,"h":1844},
+{"id":"AKV-099","f":"IMG_3668.JPG","w":3264,"h":2448},
+{"id":"AKV-100","f":"IMG_3701.JPG","w":2109,"h":1663},
+{"id":"AKV-101","f":"IMG_3702.JPG","w":2563,"h":1870},
+{"id":"AKV-102","f":"IMG_3704.JPG","w":2788,"h":1909},
+{"id":"AKV-103","f":"IMG_3713.JPG","w":2033,"h":2578},
+{"id":"AKV-104","f":"IMG_3715.JPG","w":1930,"h":2629},
+{"id":"AKV-105","f":"IMG_3739.jpeg","w":1850,"h":2861},
+{"id":"AKV-106","f":"IMG_3748.JPG","w":3264,"h":2448},
+{"id":"AKV-107","f":"IMG_3749.JPG","w":3264,"h":2448},
+{"id":"AKV-108","f":"IMG_3772.JPG","w":2859,"h":2128},
+{"id":"AKV-109","f":"IMG_3782.JPG","w":2016,"h":2968},
+{"id":"AKV-110","f":"IMG_3860.JPG","w":2083,"h":2668},
+{"id":"AKV-111","f":"IMG_3913.jpeg","w":2780,"h":1891},
+{"id":"AKV-112","f":"IMG_4018.jpeg","w":2957,"h":3858},
+{"id":"AKV-113","f":"IMG_4108.jpeg","w":2127,"h":3273},
+{"id":"AKV-114","f":"IMG_4151.jpeg","w":2799,"h":3694},
+{"id":"AKV-115","f":"IMG_4154.jpeg","w":2730,"h":2032},
+{"id":"AKV-116","f":"IMG_4155.jpeg","w":2926,"h":2211},
+{"id":"AKV-117","f":"IMG_4159.JPG","w":2699,"h":2006},
+{"id":"AKV-118","f":"IMG_4163.JPG","w":1965,"h":2656},
+{"id":"AKV-119","f":"IMG_4345.JPG","w":2285,"h":2733},
+{"id":"AKV-120","f":"IMG_4404.JPG","w":1733,"h":2350},
+{"id":"AKV-121","f":"IMG_4408.JPG","w":3264,"h":2448},
+{"id":"AKV-122","f":"IMG_4409.JPG","w":3264,"h":2448},
+{"id":"AKV-123","f":"IMG_4414.JPG","w":2268,"h":2929},
+{"id":"AKV-124","f":"IMG_4439.JPG","w":3264,"h":2448},
+{"id":"AKV-125","f":"IMG_4448.JPG","w":2039,"h":2773},
+{"id":"AKV-126","f":"IMG_4453.JPG","w":2456,"h":1883},
+{"id":"AKV-127","f":"IMG_4520.jpeg","w":3582,"h":2523},
+{"id":"AKV-128","f":"IMG_4717.jpeg","w":1988,"h":2745},
+{"id":"AKV-129","f":"IMG_4735.jpeg","w":2399,"h":3429},
+{"id":"AKV-130","f":"IMG_4748.jpeg","w":2477,"h":3211},
+{"id":"AKV-131","f":"IMG_4799.jpeg","w":2679,"h":3442},
+{"id":"AKV-132","f":"IMG_4802.jpeg","w":2318,"h":4029},
+{"id":"AKV-133","f":"IMG_4804.jpeg","w":2975,"h":4032},
+{"id":"AKV-134","f":"IMG_4807.jpeg","w":935,"h":968},
+{"id":"AKV-135","f":"IMG_4869.JPG","w":2865,"h":2331},
+{"id":"AKV-136","f":"IMG_4914.jpeg","w":2668,"h":2694},
+{"id":"AKV-137","f":"IMG_4916.jpeg","w":2562,"h":3296},
+{"id":"AKV-138","f":"IMG_4950.jpeg","w":3383,"h":2318},
+{"id":"AKV-139","f":"IMG_4988.JPG","w":1872,"h":2434},
+{"id":"AKV-140","f":"IMG_5723.JPG","w":3264,"h":2448},
+{"id":"AKV-141","f":"IMG_6210.jpeg","w":1964,"h":2739},
+{"id":"AKV-142","f":"IMG_6222.jpeg","w":4032,"h":3024},
+{"id":"AKV-143","f":"IMG_6296.jpeg","w":2011,"h":2830},
+{"id":"AKV-144","f":"IMG_6314.jpeg","w":2153,"h":2906},
+{"id":"AKV-145","f":"IMG_6349.jpeg","w":2133,"h":1745},
+{"id":"AKV-146","f":"IMG_6350.jpeg","w":2005,"h":2070},
+{"id":"AKV-147","f":"IMG_6354.jpeg","w":1914,"h":2227},
+{"id":"AKV-148","f":"IMG_6642.jpeg","w":1495,"h":947},
+{"id":"AKV-149","f":"IMG_6701.jpeg","w":2783,"h":2823},
+{"id":"AKV-150","f":"IMG_7015.jpeg","w":2537,"h":3623},
+{"id":"AKV-151","f":"IMG_7386.jpeg","w":2070,"h":2977},
+{"id":"AKV-152","f":"IMG_7433.jpeg","w":2212,"h":3084},
+{"id":"AKV-153","f":"IMG_7508.jpeg","w":2026,"h":2992},
+{"id":"AKV-154","f":"IMG_7536.jpeg","w":2390,"h":3483},
+{"id":"AKV-155","f":"IMG_7538.jpeg","w":2292,"h":3124},
+{"id":"AKV-156","f":"IMG_7608.jpeg","w":1687,"h":2432},
+{"id":"AKV-157","f":"IMG_8040.jpeg","w":1700,"h":2667},
+{"id":"AKV-158","f":"IMG_8068.jpeg","w":2304,"h":3323},
+{"id":"AKV-159","f":"IMG_8069.jpeg","w":2155,"h":3139},
+{"id":"AKV-160","f":"IMG_8075.jpeg","w":2163,"h":3066},
+{"id":"AKV-161","f":"IMG_8247.jpeg","w":2472,"h":3559},
+{"id":"AKV-162","f":"IMG_8249.jpeg","w":2415,"h":3437},
+{"id":"AKV-163","f":"IMG_8250.jpeg","w":2665,"h":2809},
+{"id":"AKV-164","f":"IMG_8251.jpeg","w":3355,"h":2376},
+{"id":"AKV-165","f":"IMG_8361.jpeg","w":2439,"h":3725},
+{"id":"AKV-166","f":"IMG_8364.jpeg","w":2204,"h":3146},
+{"id":"AKV-167","f":"IMG_8366.jpeg","w":2302,"h":3372}
+];
+
+/* --- REMOVED IMAGES --- */
+const REMOVED_KEY = 'akvarellit_removed';
+let removedStack = []; // stack for undo
+
+function loadRemoved() {
+    try {
+        const raw = localStorage.getItem(REMOVED_KEY);
+        if (raw) return new Set(JSON.parse(raw));
+    } catch {}
+    return new Set();
+}
+
+function saveRemoved(removedSet) {
+    localStorage.setItem(REMOVED_KEY, JSON.stringify([...removedSet]));
+}
+
+function removeImage(id) {
+    const removedSet = loadRemoved();
+    removedSet.add(id);
+    saveRemoved(removedSet);
+    removedStack.push(id);
+    updateUndoBar();
+    render();
+}
+
+function undoRemove() {
+    if (removedStack.length === 0) return;
+    const id = removedStack.pop();
+    const removedSet = loadRemoved();
+    removedSet.delete(id);
+    saveRemoved(removedSet);
+    updateUndoBar();
+    render();
+}
+
+function updateUndoBar() {
+    const bar = document.getElementById('undo-bar');
+    if (removedStack.length > 0) {
+        const lastId = removedStack[removedStack.length - 1];
+        document.getElementById('undo-text').textContent = `Poistettu: ${lastId}`;
+        bar.classList.add('visible');
+    } else {
+        bar.classList.remove('visible');
+    }
+}
+
+/* --- LAYOUTS (localStorage) --- */
+const LAYOUT_KEY = 'akvarellit_layouts';
+
+function loadLayouts() {
+    try {
+        const raw = localStorage.getItem(LAYOUT_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+}
+
+function saveLayoutsData(layouts) {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layouts));
+}
+
+function setPageLayout(pageIdx, count) {
+    const layouts = loadLayouts();
+    while (layouts.length <= pageIdx) layouts.push(1);
+    layouts[pageIdx] = count;
+    saveLayoutsData(layouts);
+    render();
+}
+
+/* --- SAVE TO FILE --- */
+function saveToFile() {
+    const data = {
+        saved: new Date().toISOString(),
+        order: loadOrder().map(img => img.id),
+        removed: [...loadRemoved()],
+        layouts: loadLayouts()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'asetukset.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    document.getElementById('save-status').textContent = 'Tallennettu: asetukset.json';
+    setTimeout(() => document.getElementById('save-status').textContent = '', 3000);
+}
+
+/* --- ORDER (localStorage) --- */
+const ORDER_KEY = 'akvarellit_order';
+
+function loadOrder() {
+    try {
+        const raw = localStorage.getItem(ORDER_KEY);
+        if (raw) {
+            const ids = JSON.parse(raw);
+            const byId = {};
+            catalog.forEach(img => byId[img.id] = img);
+            const ordered = ids.map(id => byId[id]).filter(Boolean);
+            const savedSet = new Set(ids);
+            catalog.forEach(img => { if (!savedSet.has(img.id)) ordered.push(img); });
+            return ordered;
+        }
+    } catch {}
+    return [...catalog];
+}
+
+function saveOrder(ordered) {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(ordered.map(img => img.id)));
+}
+
+function doGlobalSwap() {
+    const aVal = parseInt(document.getElementById('swap-a').value);
+    const bVal = parseInt(document.getElementById('swap-b').value);
+    const statusEl = document.getElementById('swap-status');
+    if (!aVal || !bVal || aVal === bVal) {
+        statusEl.textContent = 'Anna kaksi eri numeroa';
+        return;
+    }
+    if (aVal < 1 || aVal > catalog.length || bVal < 1 || bVal > catalog.length) {
+        statusEl.textContent = 'Numero 1\u2013' + catalog.length;
+        return;
+    }
+    if (swapImages(aVal, bVal)) {
+        statusEl.textContent = `AKV-${String(aVal).padStart(3,'0')} \u21C4 AKV-${String(bVal).padStart(3,'0')}`;
+        document.getElementById('swap-a').value = '';
+        document.getElementById('swap-b').value = '';
+        render();
+        setTimeout(() => statusEl.textContent = '', 3000);
+    } else {
+        statusEl.textContent = 'Vaihto epäonnistui';
+    }
+}
+
+function swapImages(id1Num, id2Num) {
+    const ordered = loadOrder();
+    const idx1 = ordered.findIndex(img => img.id === 'AKV-' + String(id1Num).padStart(3, '0'));
+    const idx2 = ordered.findIndex(img => img.id === 'AKV-' + String(id2Num).padStart(3, '0'));
+    if (idx1 === -1 || idx2 === -1) return false;
+    [ordered[idx1], ordered[idx2]] = [ordered[idx2], ordered[idx1]];
+    saveOrder(ordered);
+    return true;
+}
+
+/* --- HELPERS --- */
+function makeOverlay(img) {
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    const swapInput = document.createElement('input');
+    swapInput.className = 'swap-input';
+    swapInput.type = 'text';
+    swapInput.placeholder = '#';
+    swapInput.title = 'Vaihda paikka: kirjoita toisen kuvan numero';
+    const swapBtn = document.createElement('button');
+    swapBtn.className = 'swap-btn';
+    swapBtn.textContent = '\u21C4';
+    swapBtn.title = 'Vaihda';
+    const thisNum = parseInt(img.id.replace('AKV-', ''));
+    function doSwap() {
+        const target = parseInt(swapInput.value);
+        if (target && target !== thisNum && target >= 1 && target <= catalog.length) {
+            if (swapImages(thisNum, target)) render();
+        }
+    }
+    swapInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSwap(); } });
+    swapBtn.addEventListener('click', e => { e.stopPropagation(); doSwap(); });
+    overlay.appendChild(swapInput);
+    overlay.appendChild(swapBtn);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = 'Poista';
+    removeBtn.title = 'Poista kuva';
+    removeBtn.addEventListener('click', e => { e.stopPropagation(); removeImage(img.id); });
+    overlay.appendChild(removeBtn);
+
+    return overlay;
+}
+
+function makeIdTag(img) {
+    const t = document.createElement('span');
+    t.className = 'id-tag';
+    t.textContent = img.id;
+    return t;
+}
+
+// Build a single A4 page element with 1, 2 or 3 images
+// pageIdx = index in the layouts array (for the layout selector)
+function buildA4(images, pageIdx, layoutCount) {
+    const page = document.createElement('div');
+
+    if (images.length === 1) {
+        page.className = 'a4';
+        const imgEl = document.createElement('img');
+        imgEl.src = 'akvarellit/' + images[0].f;
+        imgEl.alt = images[0].id;
+        imgEl.loading = 'lazy';
+        page.appendChild(imgEl);
+        page.appendChild(makeOverlay(images[0]));
+        page.appendChild(makeIdTag(images[0]));
+    } else {
+        page.className = 'a4 multi';
+        images.forEach(img => {
+            const slot = document.createElement('div');
+            slot.className = 'img-slot';
+            const imgEl = document.createElement('img');
+            imgEl.src = 'akvarellit/' + img.f;
+            imgEl.alt = img.id;
+            imgEl.loading = 'lazy';
+            slot.appendChild(imgEl);
+            slot.appendChild(makeOverlay(img));
+            slot.appendChild(makeIdTag(img));
+            page.appendChild(slot);
+        });
+    }
+
+    // Layout selector (1/2/3 images per page)
+    if (pageIdx !== undefined) {
+        const select = document.createElement('select');
+        select.className = 'layout-select';
+        [1, 2, 3].forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n + (n === 1 ? ' kuva' : ' kuvaa');
+            select.appendChild(opt);
+        });
+        select.value = layoutCount || images.length;
+        select.addEventListener('change', () => {
+            setPageLayout(pageIdx, parseInt(select.value));
+        });
+        page.appendChild(select);
+    }
+
+    return page;
+}
+
+/* --- DISTRIBUTE IMAGES ACROSS PAGES --- */
+// Each page consumes 1, 2 or 3 images based on its layout setting.
+// Returns array of { images: [...], layout: N, pageIdx: N }
+function distributeImages(images, layouts) {
+    const pages = [];
+    let imgIdx = 0;
+    let pageIdx = 0;
+
+    while (imgIdx < images.length) {
+        const layout = (pageIdx < layouts.length) ? layouts[pageIdx] : 1;
+        const count = Math.min(layout, images.length - imgIdx);
+        pages.push({
+            images: images.slice(imgIdx, imgIdx + count),
+            layout: layout,
+            pageIdx: pageIdx
+        });
+        imgIdx += count;
+        pageIdx++;
+    }
+
+    return pages;
+}
+
+/* --- RENDER --- */
+function render() {
+    const allImages = loadOrder();
+    const removedSet = loadRemoved();
+    const images = allImages.filter(img => !removedSet.has(img.id));
+    const layouts = loadLayouts();
+    const container = document.getElementById('book');
+    container.innerHTML = '';
+
+    const a4Pages = distributeImages(images, layouts);
+
+    if (a4Pages.length === 0) return;
+
+    // --- COVER (page index 0) ---
+    const coverWrap = document.createElement('div');
+    coverWrap.className = 'cover-wrap';
+    coverWrap.appendChild(buildA4(a4Pages[0].images, a4Pages[0].pageIdx, a4Pages[0].layout));
+    container.appendChild(coverWrap);
+
+    const coverLabel = document.createElement('div');
+    coverLabel.className = 'spread-label';
+    coverLabel.textContent = 'Kansi (sivu 1)';
+    container.appendChild(coverLabel);
+
+    // --- SPREADS ---
+    // Page 2 is always blank, then content pages follow
+    const innerPages = a4Pages.slice(1, a4Pages.length - 1);
+    // Prepend null for the blank page 2
+    const spreadPages = [null, ...innerPages];
+
+    for (let i = 0; i < spreadPages.length; i += 2) {
+        const spread = document.createElement('div');
+        spread.className = 'spread';
+
+        // Left page
+        if (spreadPages[i]) {
+            const p = spreadPages[i];
+            const leftPage = buildA4(p.images, p.pageIdx, p.layout);
+            leftPage.classList.add('left');
+            spread.appendChild(leftPage);
+        } else {
+            const empty = document.createElement('div');
+            empty.className = 'a4 left';
+            empty.style.background = '#fafafa';
+            spread.appendChild(empty);
+        }
+
+        // Right page
+        if (i + 1 < spreadPages.length && spreadPages[i + 1]) {
+            const p = spreadPages[i + 1];
+            spread.appendChild(buildA4(p.images, p.pageIdx, p.layout));
+        } else {
+            const empty = document.createElement('div');
+            empty.className = 'a4';
+            empty.style.background = '#fafafa';
+            spread.appendChild(empty);
+        }
+
+        container.appendChild(spread);
+
+        const label = document.createElement('div');
+        label.className = 'spread-label';
+        const leftNum = i + 2; // page 2 is blank, page 3 is first content
+        const rightNum = i + 3;
+        label.textContent = `Sivut ${leftNum}\u2013${rightNum}`;
+        container.appendChild(label);
+    }
+
+    // --- BACK COVER ---
+    if (a4Pages.length > 1) {
+        const last = a4Pages[a4Pages.length - 1];
+        const backWrap = document.createElement('div');
+        backWrap.className = 'cover-wrap';
+        backWrap.appendChild(buildA4(last.images, last.pageIdx, last.layout));
+        container.appendChild(backWrap);
+
+        const backLabel = document.createElement('div');
+        backLabel.className = 'spread-label';
+        backLabel.textContent = 'Takakansi';
+        container.appendChild(backLabel);
+    }
+
+    const totalBookPages = 1 + 1 + spreadPages.length + 1; // cover + blank + inner + back
+    document.getElementById('subtitle').textContent =
+        `${images.length} maalausta \u2014 ${a4Pages.length} sivua sisältöä \u2014 kirjaladonta \u2014 2.5mm reunus`;
+}
+
+render();
+</script>
+</body>
+</html>
