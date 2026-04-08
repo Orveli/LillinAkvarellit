@@ -338,7 +338,7 @@ void main() {
   // ---- Current image: barrel + zoom ----
   float bAmt = -uBarrelAmt * p;
   vec2 curDistUv = barrel(uv, bAmt);
-  float zoomFactor = pow(uZoomPow, p);
+  float zoomFactor = 1.0 + (uZoomPow - 1.0) * p;
   vec2 zoomCenter = vec2(0.5) + mOff * uZoomMouse * p;
   vec2 currentUv = (curDistUv - zoomCenter) / zoomFactor + zoomCenter;
   currentUv += parallax * (1.0 - p);
