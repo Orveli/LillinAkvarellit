@@ -352,16 +352,17 @@ void main() {
     curCol = texture2D(uCurrent, cUv).rgb;
   }
 
-  // ---- Sample next (clean) ----
-  vec3 nxtCol;
-  if (nUv.x < 0.0 || nUv.x > 1.0 || nUv.y < 0.0 || nUv.y > 1.0) {
-    nxtCol = vec3(0.04, 0.035, 0.03);
-  } else {
-    nxtCol = texture2D(uNext, nUv).rgb;
-  }
+  // ---- Sample next (CLAMP_TO_EDGE extends edge pixels instead of black) ----
+  vec3 nxtCol = texture2D(uNext, clamp(nUv, 0.0, 1.0)).rgb;
+
+  // ---- Constrain boundary to next image coverage ----
+  // Don't reveal next image where it hasn't scaled up yet
+  float edgeDist = min(min(nUv.x, 1.0 - nUv.x), min(nUv.y, 1.0 - nUv.y));
+  float nextCoverage = smoothstep(-0.03, 0.05, edgeDist);
+  float maskedBoundary = mix(1.0, boundary, nextCoverage);
 
   // ---- Mix ----
-  vec3 col = mix(nxtCol, curCol, boundary);
+  vec3 col = mix(nxtCol, curCol, maskedBoundary);
 
   // ---- Mouse glow ----
   if (uGlowAmt > 0.0) {
