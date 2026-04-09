@@ -14,33 +14,59 @@
     position: fixed; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    z-index: 50; pointer-events: none;
+    z-index: 50;
+    background: #0a0908;
   }
-  #title.hidden { opacity: 0; }
+  #title.hidden { opacity: 0; pointer-events: none; }
   #title h1 {
     font-family: 'Cormorant Garamond', serif;
-    font-weight: 300; font-size: clamp(2rem, 6vw, 5rem);
-    color: #d8cec2; letter-spacing: 0.25em;
+    font-weight: 300; font-size: clamp(3rem, 8vw, 7rem);
+    color: #d8cec2; letter-spacing: 0.3em;
     opacity: 0; animation: fi 2s ease-out 0.3s forwards;
+  }
+  #title.shown h1, #title.shown .sub, #title.shown #musicBtn, #title.shown #scrollHint {
+    animation: none; opacity: 1;
   }
   #title .sub {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 300; font-style: italic;
-    font-size: clamp(0.65rem, 1.3vw, 0.9rem);
-    color: #4a4038; letter-spacing: 0.15em;
-    margin-top: 1.2rem; opacity: 0;
+    font-size: clamp(1rem, 2.5vw, 1.8rem);
+    color: #6a5e52; letter-spacing: 0.15em;
+    margin-top: 0.5rem; opacity: 0;
     animation: fi 2s ease-out 1.2s forwards;
   }
-  @keyframes fi { to { opacity: 1; } }
-
-  #counter {
-    position: fixed; bottom: 1.5rem; left: 50%;
-    transform: translateX(-50%);
+  #musicBtn {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 0.7rem; letter-spacing: 0.3em;
-    color: rgba(200,180,160,0.3);
-    z-index: 100; pointer-events: none;
-    font-variant-numeric: tabular-nums;
+    font-weight: 300; font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+    color: #4a4038; letter-spacing: 0.2em;
+    background: none; border: 1px solid #3a342e;
+    padding: 0.5em 1.5em; margin-top: 2.5rem;
+    cursor: pointer; opacity: 0;
+    animation: fi 2s ease-out 1.8s forwards;
+    transition: color 0.3s, border-color 0.3s;
+  }
+  #musicBtn:hover { color: #d8cec2; border-color: #6a5e52; }
+  #musicBtn.playing { color: #6a8a6a; border-color: #4a6a4a; }
+  #scrollHint {
+    position: absolute; bottom: 2.5rem; left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.5rem; opacity: 0;
+    animation: fi 2s ease-out 2.4s forwards;
+  }
+  #scrollHint span {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300; font-size: clamp(1rem, 2vw, 1.4rem);
+    color: #4a4038; letter-spacing: 0.25em;
+  }
+  #scrollHint .arrow {
+    font-size: 2rem; color: #4a4038;
+    animation: bounce 2s ease-in-out 3s infinite;
+  }
+  @keyframes fi { to { opacity: 1; } }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(6px); }
   }
 
   #loader {
@@ -60,8 +86,6 @@
   #title { transition: opacity 1.5s, right 0.35s ease; }
   body.panel-open #title { right: 320px; }
 
-  #counter { transition: left 0.35s ease; }
-  body.panel-open #counter { left: calc(50% - 160px); }
 
   /* ===== SETTINGS PANEL ===== */
   #panel {
@@ -175,17 +199,22 @@
 <div id="loader"><p>LADATAAN</p></div>
 <canvas id="c"></canvas>
 <div id="title">
-  <h1>Lillin Akvarellit</h1>
-  <p class="sub">scrollaa sukeltaaksesi</p>
+  <h1>Lilli</h1>
+  <p class="sub">&ldquo;akvarellit&rdquo;</p>
+  <button id="musicBtn">musiikki p&auml;&auml;lle</button>
+  <div id="scrollHint">
+    <span>scrollaa</span>
+    <span class="arrow">&darr;</span>
+  </div>
 </div>
-<div id="counter"></div>
+<audio id="bgMusic" src="vivaldi-winter-largo.ogg" loop preload="auto"></audio>
 <div id="panelHint">[ S ] asetukset</div>
 
 <!-- ===== SETTINGS PANEL ===== -->
 <div id="panel">
   <h2>Scrollaus</h2>
   <div id="progBar"><div id="progFill"></div></div>
-  <div class="ctrl"><label>Scroll-nopeus</label><input type="range" id="sSpeed" min="0.0002" max="0.005" step="0.0001" value="0.001"><span class="val"></span></div>
+  <div class="ctrl"><label>Scroll-nopeus</label><input type="range" id="sSpeed" min="0.0001" max="0.002" step="0.0001" value="0.001"><span class="val"></span></div>
   <div class="ctrl"><label>Lerp (smooth)</label><input type="range" id="sLerp" min="0.01" max="0.25" step="0.005" value="0.06"><span class="val"></span></div>
 
   <h2>Transitio</h2>
@@ -474,6 +503,10 @@ void main() {
 
     float luma = dot(revealRGB, vec3(0.299, 0.587, 0.114));
     boundary = smoothstep(rp - feath, rp + feath, luma);
+    // Fade out any remaining mask residue near the end of transition
+    // so there's no hard snap when progress resets to 0
+    float fadeOut = smoothstep(1.0, 0.92, rp);
+    boundary *= fadeOut;
 
     // Channel split: offset reveal UV per channel for chromatic fringe at edge
     if (uChannelSplit > 0.001) {
@@ -585,7 +618,7 @@ void main() {
 <script>
 // ===== SETTINGS OBJECT =====
 const DEFAULTS = {
-  speed: 0.001, lerp: 0.06, noiseScale: 3.5, noiseSpeed: 0.3,
+  speed: 0.001, lerp: 0.02, noiseScale: 3.5, noiseSpeed: 0.3,
   noiseAmp: 0.1, feather: 0.06, radius: 1.3, nextScale: 0.08,
   transMode: 0,
   warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
@@ -1221,8 +1254,23 @@ async function init() {
   let smoothMouseX = 0.5, smoothMouseY = 0.5;
   let titleHidden = false;
   const titleEl = document.getElementById('title');
-  const counterEl = document.getElementById('counter');
   const progFill = document.getElementById('progFill');
+
+  // Music
+  const bgMusic = document.getElementById('bgMusic');
+  bgMusic.volume = 0.4;
+  const musicBtn = document.getElementById('musicBtn');
+  musicBtn.addEventListener('click', () => {
+    if (bgMusic.paused) {
+      bgMusic.play().catch(() => {});
+      musicBtn.textContent = 'musiikki pois';
+      musicBtn.classList.add('playing');
+    } else {
+      bgMusic.pause();
+      musicBtn.textContent = 'musiikki päälle';
+      musicBtn.classList.remove('playing');
+    }
+  });
 
   // Input
   window.addEventListener('wheel', (e) => {
@@ -1266,7 +1314,6 @@ async function init() {
   const startTime = performance.now();
   let lastFrame = performance.now();
 
-  let prevCounterText = '';
   let prevProgWidth = '';
 
   function render(now) {
@@ -1288,7 +1335,13 @@ async function init() {
     smoothMouseY += (mouseY - smoothMouseY) * mouseLerp;
 
     // Proactive preloading: keep textures loaded ahead of scroll position
-    loadTexture(currentIndex + 2); loadTexture(currentIndex + 3);
+    loadTexture(currentIndex + 2); loadTexture(currentIndex + 3); loadTexture(currentIndex + 4);
+    // Also preload reveal textures for current and next transitions
+    const preCI = ((currentIndex % total) + total) % total;
+    const preNI = (((currentIndex + 1) % total) + total) % total;
+    loadTexture(pickRevealIndex(preCI, preNI));
+    const preNI2 = (((currentIndex + 2) % total) + total) % total;
+    loadTexture(pickRevealIndex(preNI, preNI2));
 
     if (progress >= 1.0 && targetProgress >= 1.0 && currentIndex < total - 2) {
       currentIndex++; progress -= 1.0; targetProgress -= 1.0;
@@ -1300,7 +1353,11 @@ async function init() {
     // Apply curve
     const curvedP = applyCurve(progress);
 
-    if (progress > 0.03 && !titleHidden) { titleEl.classList.add('hidden'); titleHidden = true; }
+    if (currentIndex === 0 && progress <= 0.03) {
+      if (titleHidden) { titleEl.classList.add('shown'); titleEl.classList.remove('hidden'); titleHidden = false; }
+    } else if (!titleHidden) {
+      titleEl.classList.add('hidden'); titleHidden = true;
+    }
 
     const ci = ((currentIndex % total) + total) % total;
     const ni = (((currentIndex + 1) % total) + total) % total;
@@ -1328,8 +1385,11 @@ async function init() {
 
     // Reveal texture (third painting for image-reveal mode)
     const ri = pickRevealIndex(ci, ni);
-    const revTex = texCache[ri] || loadTexture(ri);
+    let revTex = texCache[ri] || loadTexture(ri);
     ensureUploaded(revTex);
+    // Fallback: if reveal texture not ready yet, use current image as mask
+    // (prevents next image appearing unmasked while reveal loads)
+    if (!revTex.ready) revTex = curTex;
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, revTex.tex);
     gl.uniform1i(U.uReveal, 2);
@@ -1379,8 +1439,6 @@ async function init() {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     // UI updates (only write DOM when values change)
-    const counterText = `${currentIndex + 1} / ${total}`;
-    if (counterText !== prevCounterText) { counterEl.textContent = counterText; prevCounterText = counterText; }
     const progWidth = (progress * 100).toFixed(1) + '%';
     if (progWidth !== prevProgWidth) { progFill.style.width = progWidth; prevProgWidth = progWidth; }
     if (panelOpen) drawCurve(progress);
