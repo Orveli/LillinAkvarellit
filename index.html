@@ -189,15 +189,16 @@
     position: fixed; top: 1.2rem; right: 1.2rem;
     font-family: 'Cormorant Garamond', serif;
     font-weight: 300; font-size: 0.75rem;
-    color: #4a4038; letter-spacing: 0.15em;
-    background: none; border: 1px solid #3a342e;
-    padding: 0.4em 1em; cursor: pointer;
+    color: #8a7a6a; letter-spacing: 0.15em;
+    background: rgba(10,9,8,0.6); border: 1px solid #5a4e42;
+    padding: 0.5em 1.2em; cursor: pointer;
+    backdrop-filter: blur(4px);
     z-index: 100; opacity: 0; pointer-events: none;
     transition: opacity 0.8s, color 0.3s, border-color 0.3s;
   }
-  #musicFloat.visible { opacity: 1; pointer-events: auto; }
-  #musicFloat:hover { color: #d8cec2; border-color: #6a5e52; }
-  #musicFloat.playing { color: #6a8a6a; border-color: #4a6a4a; }
+  #musicFloat.visible { opacity: 0.85; pointer-events: auto; }
+  #musicFloat:hover { opacity: 1; color: #d8cec2; border-color: #7a6e62; }
+  #musicFloat.playing { color: #8ac88a; border-color: #5a7a5a; }
 </style>
 </head>
 <body>
@@ -282,12 +283,13 @@
 
   <h2>Transition Curve</h2>
   <div id="curveWrap"><canvas id="curveCanvas"></canvas></div>
-  <p class="hint">Vedä pisteitä muokataksesi easingia · vedä vihreä piste säätääksesi max-kohtaa</p>
+  <p class="hint">Vedä pisteitä muokataksesi easingia · vedä vihreä piste (max) tai violetti piste (min) säätääksesi rajoja</p>
   <div class="toggle"><label>Keskipivotti</label><input type="checkbox" id="tMidEnabled" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
   <div class="toggle"><label>Peilikulmat</label><input type="checkbox" id="tMirrorHandles"><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
   <div style="display:flex;gap:6px;margin-top:0.4rem;">
     <button id="btnResetCurve" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">RESET CURVE</button>
     <button id="btnLinearCurve" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">LINEAARINEN</button>
+    <button id="btnLateMin" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">LATE MIN</button>
     <button id="btnEarlyMax" style="flex:1;padding:4px 0;border:none;border-radius:3px;background:#2a2420;color:#8a7a6a;font-size:9px;letter-spacing:0.1em;cursor:pointer;font-family:-apple-system,system-ui,sans-serif;">EARLY MAX</button>
   </div>
 
@@ -529,18 +531,17 @@ void main() {
   float aberration = uAberAmt * p * (1.0 - p);
   vec2 aberDir = normalize(fromCenter + 0.001);
 
+  vec2 cUvClamped = clamp(cUv, 0.0, 1.0);
   vec3 curCol;
-  if (cUv.x < 0.0 || cUv.x > 1.0 || cUv.y < 0.0 || cUv.y > 1.0) {
-    curCol = vec3(0.04, 0.035, 0.03);
-  } else if (aberration > 0.0005) {
-    curCol.r = texture2D(uCurrent, cUv + aberDir * aberration).r;
-    curCol.g = texture2D(uCurrent, cUv).g;
-    curCol.b = texture2D(uCurrent, cUv - aberDir * aberration).b;
+  if (aberration > 0.0005) {
+    curCol.r = texture2D(uCurrent, clamp(cUv + aberDir * aberration, 0.0, 1.0)).r;
+    curCol.g = texture2D(uCurrent, cUvClamped).g;
+    curCol.b = texture2D(uCurrent, clamp(cUv - aberDir * aberration, 0.0, 1.0)).b;
   } else {
-    curCol = texture2D(uCurrent, cUv).rgb;
+    curCol = texture2D(uCurrent, cUvClamped).rgb;
   }
 
-  // ---- Sample next (CLAMP_TO_EDGE extends edge pixels instead of black) ----
+  // ---- Sample next (clamp to edge for smooth transition) ----
   vec3 nxtCol = texture2D(uNext, clamp(nUv, 0.0, 1.0)).rgb;
 
   // ---- Constrain boundary to next image coverage ----
@@ -624,25 +625,26 @@ void main() {
 <script>
 // ===== SETTINGS OBJECT =====
 const DEFAULTS = {
-  speed: 0.001, lerp: 0.02, noiseScale: 3.5, noiseSpeed: 0.3,
-  noiseAmp: 0.1, feather: 0.06, radius: 1.3, nextScale: 0.08,
-  transMode: 0,
-  warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
+  speed: 0.001, lerp: 0.06, noiseScale: 3.5, noiseSpeed: 0.3,
+  noiseAmp: 0.1, feather: 0.16, radius: 1.3, nextScale: 0.01,
+  transMode: 2,
+  warpScale: 1.5, warpIntensity: 0.06, warpSpeed: 0.05, bleed: 0,
   revealSpeed: 0.55,
-  revealZoom: 0.3,
+  revealZoom: 0.82,
   channelSplit: 0,
-  edgeGlow: 0.5,
-  edgeDarken: 0.4,
-  blackBurnEvery: 5,
-  zoomPow: 7, barrel: 0.15, parallax: 0.015, zoomMouse: 0.06,
-  aber: 0.015, aberOn: true, vig: 0.55, vigOn: true,
-  grain: 0.025, grainOn: true, glow: 0.25, glowOn: true, colorOn: true,
+  edgeGlow: 0,
+  edgeDarken: 0,
+  blackBurnEvery: 0,
+  zoomPow: 1.5, barrel: 0.56, parallax: 0.015, zoomMouse: 0.06,
+  aber: 0.01, aberOn: true, vig: 0, vigOn: true,
+  grain: 0.024, grainOn: true, glow: 0, glowOn: true, colorOn: true,
 };
 const CURVE_DEFAULTS = {
-  x1: 0.2, y1: 0.0,       // handle for start (0,0)
+  x1: 0.33, y1: 0.33,      // handle for start
   mx: 0.5, my: 0.5,        // mid point (on curve)
-  mhx: 0.35, mhy: 0.5,     // mid handle (left side; right side is mirrored)
-  x2: 0.8, y2: 1.0,        // handle for end (1,1)
+  mhx: 0.33, mhy: 0.33,    // mid handle (left side; right side is mirrored)
+  x2: 0.67, y2: 0.67,      // handle for end
+  startX: 0.0,             // x where curve leaves min (0.0 = normal start)
   endX: 1.0,               // x where curve reaches max (1.0 = normal end)
   midEnabled: true,         // mid pivot point enabled
   mirrorHandles: false,     // mirror cp1 ↔ cp2
@@ -705,11 +707,15 @@ function solveT(x, xp0, xp1, xp2, xp3) {
 function applyCurve(x) {
   if (x <= 0) return 0;
   if (x >= 1) return 1;
+  const sX = curve.startX || 0;
   const eX = curve.endX;
+  // Before startX → still at min
+  if (sX > 0 && x <= sX) return 0;
   // Past endX → already at max
   if (eX < 1 && x >= eX) return 1;
-  // Remap x into 0..endX → 0..1 for curve evaluation
-  const rx = eX < 1 ? x / eX : x;
+  // Remap x from startX..endX → 0..1 for curve evaluation
+  const range = eX - sX;
+  const rx = range < 0.99 ? (x - sX) / range : x;
 
   if (!curve.midEnabled) {
     // Single cubic segment: (0,0) → (x1,y1) → (x2,y2) → (1,1)
@@ -755,6 +761,7 @@ function initCurveEditor() {
     ctx.clearRect(0, 0, W, H);
     const mhxR = 2 * curve.mx - curve.mhx;
     const mhyR = 2 * curve.my - curve.mhy;
+    const sX = curve.startX || 0;
     const eX = curve.endX;
 
     // Grid
@@ -775,6 +782,21 @@ function initCurveEditor() {
     ctx.beginPath(); ctx.moveTo(dx0, dy0); ctx.lineTo(dx1, dy1); ctx.stroke();
     ctx.setLineDash([]);
 
+    // startX marker line
+    if (sX > 0.001) {
+      ctx.strokeStyle = '#6a4a5a';
+      ctx.setLineDash([4, 4]);
+      const [sx2] = toScreen(sX, 0);
+      ctx.beginPath(); ctx.moveTo(sx2, pad); ctx.lineTo(sx2, pad + gh); ctx.stroke();
+      ctx.setLineDash([]);
+      // Flat region before startX
+      ctx.strokeStyle = 'rgba(106,74,90,0.4)';
+      ctx.lineWidth = 2;
+      const [fsx, fsy] = toScreen(0, 0);
+      const [fex, fey] = toScreen(sX, 0);
+      ctx.beginPath(); ctx.moveTo(fsx, fsy); ctx.lineTo(fex, fey); ctx.stroke();
+    }
+
     // endX marker line
     if (eX < 0.999) {
       ctx.strokeStyle = '#5a6a4a';
@@ -791,35 +813,36 @@ function initCurveEditor() {
     }
 
     // Draw curve
+    const range = eX - sX;
     ctx.strokeStyle = '#c8b8a4';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    const [sx, sy] = toScreen(0, 0);
+    const [sx, sy] = toScreen(sX, 0);
     ctx.moveTo(sx, sy);
 
     if (!curve.midEnabled) {
-      // Single segment: (0,0) → (x1,y1) → (x2,y2) → (endX,1)
+      // Single segment: (sX,0) → cp1 → cp2 → (eX,1)
       for (let i = 1; i <= 80; i++) {
         const t = i / 80;
-        const bx = cubicB(t, 0, curve.x1, curve.x2, eX);
+        const bx = cubicB(t, sX, sX + curve.x1 * range, sX + curve.x2 * range, eX);
         const by = cubicB(t, 0, curve.y1, curve.y2, 1);
         const [px, py] = toScreen(bx, by);
         ctx.lineTo(px, py);
       }
     } else {
-      // Segment 1: (0,0) → (x1,y1) → (mhx,mhy) → (mx*eX, my)
-      const mxS = curve.mx * eX;
+      // Segment 1: (sX,0) → cp1 → mh → (mid)
+      const mxS = sX + curve.mx * range;
       for (let i = 1; i <= 40; i++) {
         const t = i / 40;
-        const bx = cubicB(t, 0, curve.x1 * eX, curve.mhx * eX, mxS);
+        const bx = cubicB(t, sX, sX + curve.x1 * range, sX + curve.mhx * range, mxS);
         const by = cubicB(t, 0, curve.y1, curve.mhy, curve.my);
         const [px, py] = toScreen(bx, by);
         ctx.lineTo(px, py);
       }
-      // Segment 2: (mx*eX, my) → (mhxR*eX, mhyR) → (x2*eX, y2) → (eX, 1)
+      // Segment 2: (mid) → mhR → cp2 → (eX, 1)
       for (let i = 1; i <= 40; i++) {
         const t = i / 40;
-        const bx = cubicB(t, mxS, mhxR * eX, curve.x2 * eX, eX);
+        const bx = cubicB(t, mxS, sX + mhxR * range, sX + curve.x2 * range, eX);
         const by = cubicB(t, curve.my, mhyR, curve.y2, 1);
         const [px, py] = toScreen(bx, by);
         ctx.lineTo(px, py);
@@ -830,8 +853,8 @@ function initCurveEditor() {
     // Control lines
     ctx.strokeStyle = 'rgba(200,180,160,0.25)';
     ctx.lineWidth = 1;
-    const [c1x, c1y] = toScreen(curve.midEnabled ? curve.x1 * eX : curve.x1 * eX, curve.y1);
-    const [c2x, c2y] = toScreen(curve.midEnabled ? curve.x2 * eX : curve.x2 * eX, curve.y2);
+    const [c1x, c1y] = toScreen(sX + curve.x1 * range, curve.y1);
+    const [c2x, c2y] = toScreen(sX + curve.x2 * range, curve.y2);
     ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(c1x, c1y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(...toScreen(eX, 1)); ctx.lineTo(c2x, c2y); ctx.stroke();
 
@@ -841,10 +864,10 @@ function initCurveEditor() {
     ];
 
     if (curve.midEnabled) {
-      const mxS = curve.mx * eX;
+      const mxS = sX + curve.mx * range;
       const [msx, msy] = toScreen(mxS, curve.my);
-      const [mhsx, mhsy] = toScreen(curve.mhx * eX, curve.mhy);
-      const [mhrx, mhry] = toScreen(mhxR * eX, mhyR);
+      const [mhsx, mhsy] = toScreen(sX + curve.mhx * range, curve.mhy);
+      const [mhrx, mhry] = toScreen(sX + mhxR * range, mhyR);
       // Mid handle lines
       ctx.beginPath(); ctx.moveTo(mhsx, mhsy); ctx.lineTo(msx, msy); ctx.lineTo(mhrx, mhry); ctx.stroke();
       points.push(
@@ -852,6 +875,12 @@ function initCurveEditor() {
         { x: mhrx, y: mhry, id: 'mh_mirror', r: 3, col: '#5a6a7a' },
         { x: msx, y: msy, id: 'mid', r: 6, col: '#e8c888' },
       );
+    }
+
+    // startX handle
+    if (sX > 0.001) {
+      const [ssx, ssy] = toScreen(sX, 0);
+      points.push({ x: ssx, y: ssy, id: 'startX', r: 5, col: '#6a4a5a' });
     }
 
     // endX handle
@@ -881,16 +910,21 @@ function initCurveEditor() {
   function hitTest(sx, sy) {
     const mhxR = 2 * curve.mx - curve.mhx;
     const mhyR = 2 * curve.my - curve.mhy;
+    const sX = curve.startX || 0;
     const eX = curve.endX;
+    const range = eX - sX;
     const pts = [
-      { s: toScreen(curve.x1 * eX, curve.y1), id: 'cp1' },
-      { s: toScreen(curve.x2 * eX, curve.y2), id: 'cp2' },
+      { s: toScreen(sX + curve.x1 * range, curve.y1), id: 'cp1' },
+      { s: toScreen(sX + curve.x2 * range, curve.y2), id: 'cp2' },
     ];
     if (curve.midEnabled) {
       pts.unshift(
-        { s: toScreen(curve.mx * eX, curve.my), id: 'mid' },
-        { s: toScreen(curve.mhx * eX, curve.mhy), id: 'mh' },
+        { s: toScreen(sX + curve.mx * range, curve.my), id: 'mid' },
+        { s: toScreen(sX + curve.mhx * range, curve.mhy), id: 'mh' },
       );
+    }
+    if (sX > 0.001) {
+      pts.push({ s: toScreen(sX, 0), id: 'startX' });
     }
     if (eX < 0.999) {
       pts.push({ s: toScreen(eX, 1), id: 'endX' });
@@ -912,9 +946,11 @@ function initCurveEditor() {
     const [nx, ny] = fromScreen(e.clientX - r.left, e.clientY - r.top);
     const cx = Math.max(0, Math.min(1, nx));
     const cy = Math.max(0, Math.min(1, ny));
+    const sX = curve.startX || 0;
     const eX = curve.endX;
-    // Convert screen x to normalized curve x (0..1 within the endX range)
-    const ncx = eX > 0.01 ? Math.max(0, Math.min(1, cx / eX)) : cx;
+    const range = eX - sX;
+    // Convert screen x to normalized curve x (0..1 within the startX..endX range)
+    const ncx = range > 0.01 ? Math.max(0, Math.min(1, (cx - sX) / range)) : cx;
 
     if (dragging === 'cp1') {
       curve.x1 = curve.midEnabled ? Math.min(ncx, curve.mx) : Math.min(ncx, 1);
@@ -937,8 +973,11 @@ function initCurveEditor() {
       curve.mhx = Math.max(0, Math.min(curve.mx, ncx));
       curve.mhy = cy;
     }
+    else if (dragging === 'startX') {
+      curve.startX = Math.max(0, Math.min(eX - 0.15, cx));
+    }
     else if (dragging === 'endX') {
-      curve.endX = Math.max(0.15, Math.min(1, cx));
+      curve.endX = Math.max(sX + 0.15, Math.min(1, cx));
     }
   });
 
@@ -958,8 +997,14 @@ function initCurveEditor() {
       mx: 0.5, my: 0.5,
       mhx: 0.33, mhy: 0.33,
       x2: 0.67, y2: 0.67,
+      startX: 0.0,
       endX: 1.0,
     });
+  });
+
+  // Late min button – sets startX to 0.3 so curve stays at 0 longer
+  document.getElementById('btnLateMin').addEventListener('click', () => {
+    curve.startX = 0.3;
   });
 
   // Early max button – sets endX to 0.7 so curve reaches max earlier
