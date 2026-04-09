@@ -184,14 +184,20 @@
   }
   #progFill { height: 100%; background: #c8b8a4; width: 0%; }
 
-  /* Toggle button hint */
-  #panelHint {
-    position: fixed; top: 1rem; right: 1rem;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 10px; color: #3a342e; letter-spacing: 0.1em;
-    z-index: 100; pointer-events: none;
-    transition: opacity 0.5s;
+  /* Floating music toggle (top right, visible after scrolling) */
+  #musicFloat {
+    position: fixed; top: 1.2rem; right: 1.2rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300; font-size: 0.75rem;
+    color: #4a4038; letter-spacing: 0.15em;
+    background: none; border: 1px solid #3a342e;
+    padding: 0.4em 1em; cursor: pointer;
+    z-index: 100; opacity: 0; pointer-events: none;
+    transition: opacity 0.8s, color 0.3s, border-color 0.3s;
   }
+  #musicFloat.visible { opacity: 1; pointer-events: auto; }
+  #musicFloat:hover { color: #d8cec2; border-color: #6a5e52; }
+  #musicFloat.playing { color: #6a8a6a; border-color: #4a6a4a; }
 </style>
 </head>
 <body>
@@ -208,7 +214,7 @@
   </div>
 </div>
 <audio id="bgMusic" src="vivaldi-winter-largo.ogg" loop preload="auto"></audio>
-<div id="panelHint">[ S ] asetukset</div>
+<button id="musicFloat">musiikki p&auml;&auml;lle</button>
 
 <!-- ===== SETTINGS PANEL ===== -->
 <div id="panel">
@@ -1221,14 +1227,12 @@ async function init() {
 
   // Panel toggle
   const panel = document.getElementById('panel');
-  const panelHint = document.getElementById('panelHint');
   window.addEventListener('keydown', (e) => {
     if (e.key === 's' || e.key === 'S') {
       if (e.metaKey || e.ctrlKey) return; // don't hijack save
       panelOpen = !panelOpen;
       panel.classList.toggle('open', panelOpen);
       document.body.classList.toggle('panel-open', panelOpen);
-      panelHint.style.opacity = panelOpen ? '0' : '1';
       e.preventDefault();
     }
   });
@@ -1260,17 +1264,24 @@ async function init() {
   const bgMusic = document.getElementById('bgMusic');
   bgMusic.volume = 0.4;
   const musicBtn = document.getElementById('musicBtn');
-  musicBtn.addEventListener('click', () => {
+  const musicFloat = document.getElementById('musicFloat');
+  function toggleMusic() {
     if (bgMusic.paused) {
       bgMusic.play().catch(() => {});
       musicBtn.textContent = 'musiikki pois';
       musicBtn.classList.add('playing');
+      musicFloat.textContent = 'musiikki pois';
+      musicFloat.classList.add('playing');
     } else {
       bgMusic.pause();
       musicBtn.textContent = 'musiikki päälle';
       musicBtn.classList.remove('playing');
+      musicFloat.textContent = 'musiikki päälle';
+      musicFloat.classList.remove('playing');
     }
-  });
+  }
+  musicBtn.addEventListener('click', toggleMusic);
+  musicFloat.addEventListener('click', toggleMusic);
 
   // Input
   window.addEventListener('wheel', (e) => {
@@ -1354,9 +1365,9 @@ async function init() {
     const curvedP = applyCurve(progress);
 
     if (currentIndex === 0 && progress <= 0.03) {
-      if (titleHidden) { titleEl.classList.add('shown'); titleEl.classList.remove('hidden'); titleHidden = false; }
+      if (titleHidden) { titleEl.classList.add('shown'); titleEl.classList.remove('hidden'); titleHidden = false; musicFloat.classList.remove('visible'); }
     } else if (!titleHidden) {
-      titleEl.classList.add('hidden'); titleHidden = true;
+      titleEl.classList.add('hidden'); titleHidden = true; musicFloat.classList.add('visible');
     }
 
     const ci = ((currentIndex % total) + total) % total;
