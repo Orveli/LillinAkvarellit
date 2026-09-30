@@ -15,6 +15,8 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     z-index: 50; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(10,9,8,0.6) 0%, transparent 70%);
+    transition: opacity 1s ease;
   }
   #title.hidden { opacity: 0; }
   #title h1 {
@@ -189,38 +191,16 @@
   <div class="ctrl"><label>Lerp (smooth)</label><input type="range" id="sLerp" min="0.01" max="0.25" step="0.005" value="0.06"><span class="val"></span></div>
 
   <h2>Transitio</h2>
-  <div class="ctrl" style="margin-bottom:0.6rem">
-    <label>Tyyli</label>
-    <select id="sTransMode" style="flex:1;background:#1a1714;color:#c8b8a4;border:1px solid #2a2420;border-radius:3px;padding:3px 6px;font-size:10px;font-family:-apple-system,system-ui,sans-serif;cursor:pointer;">
-      <option value="0">Radiaalinen</option>
-      <option value="1">Akvarelli-bleed</option>
-      <option value="2">Kuva-reveal</option>
-    </select>
-  </div>
   <div class="ctrl"><label>Reuna-feather</label><input type="range" id="sFeather" min="0.01" max="0.3" step="0.005" value="0.06"><span class="val"></span></div>
   <div class="ctrl"><label>Next-aloituskoko</label><input type="range" id="sNextScale" min="0.01" max="0.5" step="0.01" value="0.08"><span class="val"></span></div>
-
-  <div id="radialControls">
-    <div class="ctrl"><label>Noise-skaala</label><input type="range" id="sNoiseScale" min="0.5" max="12" step="0.1" value="3.5"><span class="val"></span></div>
-    <div class="ctrl"><label>Noise-nopeus</label><input type="range" id="sNoiseSpeed" min="0" max="0.4" step="0.005" value="0.3"><span class="val"></span></div>
-    <div class="ctrl"><label>Noise-määrä</label><input type="range" id="sNoiseAmp" min="0" max="0.4" step="0.005" value="0.1"><span class="val"></span></div>
-    <div class="ctrl"><label>Radius-kerroin</label><input type="range" id="sRadius" min="0.8" max="2.0" step="0.05" value="1.3"><span class="val"></span></div>
-  </div>
-
-  <div id="watercolorControls" style="display:none">
-    <div class="ctrl"><label>Warp-skaala</label><input type="range" id="sWarpScale" min="1" max="8" step="0.1" value="3"><span class="val"></span></div>
-    <div class="ctrl"><label>Warp-voimakkuus</label><input type="range" id="sWarpIntensity" min="0.05" max="0.8" step="0.01" value="0.3"><span class="val"></span></div>
-    <div class="ctrl"><label>Warp-nopeus</label><input type="range" id="sWarpSpeed" min="0" max="0.5" step="0.005" value="0.12"><span class="val"></span></div>
-    <div class="ctrl"><label>Värivuoto</label><input type="range" id="sBleed" min="0" max="0.05" step="0.001" value="0.015"><span class="val"></span></div>
-  </div>
-
-  <div id="revealControls" style="display:none">
-    <div class="ctrl"><label>Reveal-nopeus</label><input type="range" id="sRevealSpeed" min="0.2" max="1.0" step="0.01" value="0.55"><span class="val"></span></div>
-    <div class="ctrl"><label>Kanavasplit</label><input type="range" id="sChannelSplit" min="0" max="1.0" step="0.01" value="0"><span class="val"></span></div>
-    <div class="ctrl"><label>Reunahehku</label><input type="range" id="sEdgeGlow" min="0" max="1.5" step="0.02" value="0.5"><span class="val"></span></div>
-    <div class="ctrl"><label>Pigmenttireuna</label><input type="range" id="sEdgeDarken" min="0" max="1.0" step="0.02" value="0.4"><span class="val"></span></div>
-    <div class="ctrl"><label>Maski-zoom</label><input type="range" id="sRevealZoom" min="0" max="1.5" step="0.01" value="0.3"><span class="val"></span></div>
-  </div>
+  <div class="ctrl"><label>Warp-skaala</label><input type="range" id="sWarpScale" min="1" max="8" step="0.1" value="3"><span class="val"></span></div>
+  <div class="ctrl"><label>Warp-voimakkuus</label><input type="range" id="sWarpIntensity" min="0.05" max="0.8" step="0.01" value="0.3"><span class="val"></span></div>
+  <div class="ctrl"><label>Warp-nopeus</label><input type="range" id="sWarpSpeed" min="0" max="0.5" step="0.005" value="0.12"><span class="val"></span></div>
+  <div class="ctrl"><label>Reveal-nopeus</label><input type="range" id="sRevealSpeed" min="0.2" max="1.0" step="0.01" value="0.55"><span class="val"></span></div>
+  <div class="ctrl"><label>Kanavasplit</label><input type="range" id="sChannelSplit" min="0" max="1.0" step="0.01" value="0"><span class="val"></span></div>
+  <div class="ctrl"><label>Reunahehku</label><input type="range" id="sEdgeGlow" min="0" max="1.5" step="0.02" value="0.5"><span class="val"></span></div>
+  <div class="ctrl"><label>Pigmenttireuna</label><input type="range" id="sEdgeDarken" min="0" max="1.0" step="0.02" value="0.4"><span class="val"></span></div>
+  <div class="ctrl"><label>Maski-zoom</label><input type="range" id="sRevealZoom" min="0" max="1.5" step="0.01" value="0.3"><span class="val"></span></div>
 
   <div class="ctrl"><label>Black burn joka N:s</label><input type="range" id="sBlackBurnEvery" min="0" max="20" step="1" value="5"><span class="val"></span></div>
 
@@ -290,11 +270,7 @@ uniform vec2 uNextSize;
 uniform vec2 uRevealSize;
 
 // Tweakable uniforms
-uniform float uNoiseScale;
-uniform float uNoiseSpeed;
-uniform float uNoiseAmp;
 uniform float uFeather;
-uniform float uRadiusMult;
 uniform float uNextStartScale;
 uniform float uZoomPow;
 uniform float uBarrelAmt;
@@ -306,12 +282,10 @@ uniform float uGrainAmt;    // 0 = off
 uniform float uGlowAmt;     // 0 = off
 uniform float uColorGrade;  // 0 = off, 1 = on
 
-// Watercolor transition
-uniform float uTransitionMode; // 0 = radial, 1 = watercolor, 2 = image reveal
+// Reveal warp
 uniform float uWarpScale;
 uniform float uWarpIntensity;
 uniform float uWarpSpeed;
-uniform float uBleedAmt;
 
 // Image reveal
 uniform float uRevealSpeed;    // pow exponent for reveal progress (< 1 = faster reveal)
@@ -392,98 +366,46 @@ void main() {
 
   // ---- Boundary ----
   vec2 fromCenter = uv - 0.5;
-  float dist = length(fromCenter);
   float boundary;
   float boundaryR = -1.0;
   float boundaryB = -1.0;
 
-  if (uTransitionMode < 0.5) {
-    // === Radial noise mode (original) ===
-    float n = snoise(fromCenter * uNoiseScale + uTime * uNoiseSpeed) * uNoiseAmp;
-    n += snoise(fromCenter * uNoiseScale * 2.5 - uTime * uNoiseSpeed * 0.7) * uNoiseAmp * 0.5;
-    float radius = p * uRadiusMult;
-    float feath = uFeather + p * uFeather;
-    boundary = smoothstep(radius - feath, radius + feath, dist + n);
-  } else if (uTransitionMode < 1.5) {
-    // === Watercolor bleed mode ===
-    // Domain warping: noise(pos + noise(pos + noise(pos)))
-    float t = uTime * uWarpSpeed;
+  // === Image reveal ===
+  float rp = pow(p, uRevealSpeed);
+
+  vec2 rUv = coverUv(uv, uRevealSize, uResolution);
+  if (uRevealZoom > 0.001) {
+    float rZoom = 1.0 + uRevealZoom * rp;
+    rUv = (rUv - 0.5) / rZoom + 0.5;
+  }
+  float t = uTime * uWarpSpeed;
+  vec2 warpedRUv = rUv;
+  if (uWarpIntensity > 0.001) {
+    vec2 rCenter = rUv - 0.5;
     vec2 q = vec2(
-      snoise(fromCenter * uWarpScale + vec2(0.0, t * 0.3)),
-      snoise(fromCenter * uWarpScale + vec2(5.2, t * 0.2 + 1.3))
+      snoise(rCenter * uWarpScale + vec2(0.0, t * 0.3)),
+      snoise(rCenter * uWarpScale + vec2(5.2, t * 0.2 + 1.3))
     );
     vec2 r = vec2(
-      snoise((fromCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(1.7 - t * 0.15, 9.2)),
-      snoise((fromCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(8.3, 2.8 + t * 0.12))
+      snoise((rCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(1.7 - t * 0.15, 9.2)),
+      snoise((rCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(8.3, 2.8 + t * 0.12))
     );
-    // Third octave for fine tendrils
-    vec2 s = vec2(
-      snoise((fromCenter + uWarpIntensity * r) * uWarpScale * 2.8 + vec2(3.1, t * 0.08)),
-      snoise((fromCenter + uWarpIntensity * r) * uWarpScale * 2.8 + vec2(7.7, 4.2 - t * 0.1))
-    );
+    warpedRUv = rUv + uWarpIntensity * (q * 0.6 + r * 0.4) * 0.15;
+  }
+  vec3 revealRGB = texture2D(uReveal, clamp(warpedRUv, 0.0, 1.0)).rgb;
+  float feath = uFeather + rp * uFeather * 0.5;
 
-    // Composite warped field: blend distance with warped noise
-    float warpField = snoise(fromCenter * uWarpScale + uWarpIntensity * (q + r * 0.6 + s * 0.3));
-    // Normalize roughly to 0..1
-    warpField = warpField * 0.5 + 0.5;
-    // Blend with radial distance so transition has directionality (center → out)
-    float radialBias = dist * 1.4;
-    warpField = mix(warpField, radialBias, 0.35);
+  float luma = dot(revealRGB, vec3(0.299, 0.587, 0.114));
+  boundary = smoothstep(rp - feath, rp + feath, luma);
 
-    // Threshold based on progress
-    float feath = uFeather + p * uFeather * 0.5;
-    boundary = smoothstep(p - feath, p + feath, warpField);
-
-    // Color bleed at boundary edges: shift the sampling slightly
-    float bleedMask = smoothstep(p - feath * 2.0, p, warpField) - smoothstep(p, p + feath * 2.0, warpField);
-    bleedMask = max(bleedMask, 0.0);
-    vec2 bleedOffset = vec2(q.x, q.y) * uBleedAmt * bleedMask;
-    currentUv += bleedOffset;
-    nextUv -= bleedOffset * 0.5;
-    // Recompute cover UVs with bleed
-    cUv = coverUv(currentUv, uCurrentSize, uResolution);
-    nUv = coverUv(nextUv, uNextSize, uResolution);
-  } else {
-    // === Image reveal mode ===
-    // Remap progress so reveal runs ahead of other effects
-    float rp = pow(p, uRevealSpeed);
-
-    // Warp the reveal texture sampling UVs so the pattern breathes
-    vec2 rUv = coverUv(uv, uRevealSize, uResolution);
-    // Zoom the reveal mask with scroll progress
-    if (uRevealZoom > 0.001) {
-      float rZoom = 1.0 + uRevealZoom * rp;
-      rUv = (rUv - 0.5) / rZoom + 0.5;
-    }
-    float t = uTime * uWarpSpeed;
-    vec2 warpedRUv = rUv;
-    if (uWarpIntensity > 0.001) {
-      vec2 rCenter = rUv - 0.5;
-      vec2 q = vec2(
-        snoise(rCenter * uWarpScale + vec2(0.0, t * 0.3)),
-        snoise(rCenter * uWarpScale + vec2(5.2, t * 0.2 + 1.3))
-      );
-      vec2 r = vec2(
-        snoise((rCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(1.7 - t * 0.15, 9.2)),
-        snoise((rCenter + uWarpIntensity * q) * uWarpScale * 1.6 + vec2(8.3, 2.8 + t * 0.12))
-      );
-      warpedRUv = rUv + uWarpIntensity * (q * 0.6 + r * 0.4) * 0.15;
-    }
-    vec3 revealRGB = texture2D(uReveal, clamp(warpedRUv, 0.0, 1.0)).rgb;
-    float feath = uFeather + rp * uFeather * 0.5;
-
-    float luma = dot(revealRGB, vec3(0.299, 0.587, 0.114));
-    boundary = smoothstep(rp - feath, rp + feath, luma);
-
-    // Channel split: offset reveal UV per channel for chromatic fringe at edge
-    if (uChannelSplit > 0.001) {
-      float edgeAmt = boundary * (1.0 - boundary) * 4.0; // only at transition edge
-      vec2 splitOffset = edgeAmt * uChannelSplit * vec2(0.08, 0.04);
-      float lumaR = dot(texture2D(uReveal, clamp(warpedRUv + splitOffset, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
-      float lumaB = dot(texture2D(uReveal, clamp(warpedRUv - splitOffset, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
-      boundaryR = smoothstep(rp - feath, rp + feath, lumaR);
-      boundaryB = smoothstep(rp - feath, rp + feath, lumaB);
-    }
+  // Channel split: offset reveal UV per channel for chromatic fringe at edge
+  if (uChannelSplit > 0.001) {
+    float edgeAmt = boundary * (1.0 - boundary) * 4.0;
+    vec2 splitOffset = edgeAmt * uChannelSplit * vec2(0.08, 0.04);
+    float lumaR = dot(texture2D(uReveal, clamp(warpedRUv + splitOffset, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+    float lumaB = dot(texture2D(uReveal, clamp(warpedRUv - splitOffset, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+    boundaryR = smoothstep(rp - feath, rp + feath, lumaR);
+    boundaryB = smoothstep(rp - feath, rp + feath, lumaB);
   }
 
   // ---- Sample current ----
@@ -526,7 +448,7 @@ void main() {
   }
 
   // ---- Watercolor edge bloom (pigment pooling + warm glow at reveal boundary) ----
-  if (uTransitionMode > 1.5 && (uEdgeGlow > 0.001 || uEdgeDarken > 0.001)) {
+  if (uEdgeGlow > 0.001 || uEdgeDarken > 0.001) {
     // Edge intensity: peaks right at the reveal boundary, fades on both sides
     float edge = maskedBoundary * (1.0 - maskedBoundary) * 4.0;
     // Sharper pigment line (narrow dark band like paint pooling at brush edge)
@@ -585,10 +507,8 @@ void main() {
 <script>
 // ===== SETTINGS OBJECT =====
 const DEFAULTS = {
-  speed: 0.001, lerp: 0.06, noiseScale: 3.5, noiseSpeed: 0.3,
-  noiseAmp: 0.1, feather: 0.06, radius: 1.3, nextScale: 0.08,
-  transMode: 0,
-  warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
+  speed: 0.001, lerp: 0.06, feather: 0.06, nextScale: 0.08,
+  warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12,
   revealSpeed: 0.55,
   revealZoom: 0.3,
   channelSplit: 0,
@@ -944,11 +864,10 @@ function initCurveEditor() {
 // ===== BIND SLIDERS =====
 function bindSliders() {
   const map = {
-    sSpeed: 'speed', sLerp: 'lerp', sNoiseScale: 'noiseScale',
-    sNoiseSpeed: 'noiseSpeed', sNoiseAmp: 'noiseAmp', sFeather: 'feather',
-    sRadius: 'radius', sNextScale: 'nextScale',
+    sSpeed: 'speed', sLerp: 'lerp', sFeather: 'feather',
+    sNextScale: 'nextScale',
     sWarpScale: 'warpScale', sWarpIntensity: 'warpIntensity',
-    sWarpSpeed: 'warpSpeed', sBleed: 'bleed',
+    sWarpSpeed: 'warpSpeed',
     sRevealSpeed: 'revealSpeed',
     sRevealZoom: 'revealZoom',
     sChannelSplit: 'channelSplit',
@@ -960,22 +879,6 @@ function bindSliders() {
     sAber: 'aber', sVig: 'vig', sGrain: 'grain', sGlow: 'glow',
   };
 
-  // Transition mode selector
-  const modeSelect = document.getElementById('sTransMode');
-  const radialDiv = document.getElementById('radialControls');
-  const waterDiv = document.getElementById('watercolorControls');
-  const revealDiv = document.getElementById('revealControls');
-  modeSelect.value = S.transMode;
-  function updateModeUI() {
-    radialDiv.style.display = S.transMode === 0 ? '' : 'none';
-    waterDiv.style.display = (S.transMode === 1 || S.transMode === 2) ? '' : 'none';
-    revealDiv.style.display = S.transMode === 2 ? '' : 'none';
-  }
-  updateModeUI();
-  modeSelect.addEventListener('change', () => {
-    S.transMode = parseInt(modeSelect.value);
-    updateModeUI();
-  });
   const toggleMap = {
     tAber: 'aberOn', tVig: 'vigOn', tGrain: 'grainOn', tGlow: 'glowOn', tColor: 'colorOn',
   };
@@ -1028,8 +931,6 @@ function bindSliders() {
     for (const [id, key] of Object.entries(toggleMap)) {
       document.getElementById(id).checked = S[key];
     }
-    document.getElementById('sTransMode').value = S.transMode;
-    updateModeUI();
   });
 }
 
@@ -1087,8 +988,8 @@ async function init() {
   // All uniform locations
   const U = {};
   ['uCurrent','uNext','uReveal','uProgress','uMouse','uTime','uResolution','uCurrentSize','uNextSize','uRevealSize',
-   'uNoiseScale','uNoiseSpeed','uNoiseAmp','uFeather','uRadiusMult','uNextStartScale',
-   'uTransitionMode','uWarpScale','uWarpIntensity','uWarpSpeed','uBleedAmt',
+   'uFeather','uNextStartScale',
+   'uWarpScale','uWarpIntensity','uWarpSpeed',
    'uRevealSpeed','uRevealZoom','uChannelSplit','uEdgeGlow','uEdgeDarken',
    'uZoomPow','uBarrelAmt','uParallaxAmt','uZoomMouse',
    'uAberAmt','uVigDark','uGrainAmt','uGlowAmt','uColorGrade',
@@ -1301,6 +1202,7 @@ async function init() {
     const curvedP = applyCurve(progress);
 
     if (progress > 0.03 && !titleHidden) { titleEl.classList.add('hidden'); titleHidden = true; }
+    if (progress <= 0.01 && titleHidden) { titleEl.classList.remove('hidden'); titleHidden = false; }
 
     const ci = ((currentIndex % total) + total) % total;
     const ni = (((currentIndex + 1) % total) + total) % total;
@@ -1344,17 +1246,11 @@ async function init() {
     gl.uniform2f(U.uNextSize, nxtTex.width, nxtTex.height);
 
     // Tweakable uniforms
-    gl.uniform1f(U.uNoiseScale, S.noiseScale);
-    gl.uniform1f(U.uNoiseSpeed, S.noiseSpeed);
-    gl.uniform1f(U.uNoiseAmp, S.noiseAmp);
     gl.uniform1f(U.uFeather, S.feather);
-    gl.uniform1f(U.uRadiusMult, S.radius);
     gl.uniform1f(U.uNextStartScale, S.nextScale);
-    gl.uniform1f(U.uTransitionMode, S.transMode);
     gl.uniform1f(U.uWarpScale, S.warpScale);
     gl.uniform1f(U.uWarpIntensity, S.warpIntensity);
     gl.uniform1f(U.uWarpSpeed, S.warpSpeed);
-    gl.uniform1f(U.uBleedAmt, S.bleed);
     gl.uniform1f(U.uRevealSpeed, S.revealSpeed);
     gl.uniform1f(U.uRevealZoom, S.revealZoom);
     gl.uniform1f(U.uChannelSplit, S.channelSplit);
