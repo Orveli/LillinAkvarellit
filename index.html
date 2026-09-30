@@ -15,33 +15,39 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     z-index: 50; pointer-events: none;
+    background: rgba(10,9,8,1);
   }
-  #title.hidden { opacity: 0; }
   #title h1 {
     font-family: 'Cormorant Garamond', serif;
-    font-weight: 300; font-size: clamp(2rem, 6vw, 5rem);
+    font-weight: 300; font-size: clamp(4rem, 10vw, 5rem);
     color: #d8cec2; letter-spacing: 0.25em;
+    line-height: 1.1; text-align: center;
     opacity: 0; animation: fi 2s ease-out 0.3s forwards;
   }
   #title .sub {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 300; font-style: italic;
-    font-size: clamp(0.65rem, 1.3vw, 0.9rem);
-    color: #4a4038; letter-spacing: 0.15em;
-    margin-top: 1.2rem; opacity: 0;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    color: #5a4a3a; letter-spacing: 0.2em;
+    margin-top: 0.3rem; opacity: 0;
     animation: fi 2s ease-out 1.2s forwards;
   }
   @keyframes fi { to { opacity: 1; } }
 
-  #counter {
-    position: fixed; bottom: 1.5rem; left: 50%;
+  #scrollHint {
+    position: absolute; bottom: 12vh; left: 50%;
     transform: translateX(-50%);
     font-family: 'Cormorant Garamond', serif;
-    font-size: 0.7rem; letter-spacing: 0.3em;
-    color: rgba(200,180,160,0.3);
-    z-index: 100; pointer-events: none;
-    font-variant-numeric: tabular-nums;
+    font-weight: 300; font-style: italic;
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    letter-spacing: 0.3em;
+    color: rgba(200,180,160,0.6);
+    text-align: center; line-height: 1.4;
+    opacity: 0;
+    animation: scrollHintIn 2s ease-out 2.5s forwards;
   }
+  @keyframes scrollHintIn { to { opacity: 1; } }
+
 
   #loader {
     position: fixed; inset: 0; background: #0a0908;
@@ -57,11 +63,9 @@
   }
 
   /* ===== PANEL-OPEN LAYOUT SHIFT ===== */
-  #title { transition: opacity 1.5s, right 0.35s ease; }
+  #title { transition: right 0.35s ease; }
   body.panel-open #title { right: 320px; }
 
-  #counter { transition: left 0.35s ease; }
-  body.panel-open #counter { left: calc(50% - 160px); }
 
   /* ===== SETTINGS PANEL ===== */
   #panel {
@@ -160,14 +164,43 @@
   }
   #progFill { height: 100%; background: #c8b8a4; width: 0%; }
 
-  /* Toggle button hint */
-  #panelHint {
-    position: fixed; top: 1rem; right: 1rem;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 10px; color: #3a342e; letter-spacing: 0.1em;
-    z-index: 100; pointer-events: none;
-    transition: opacity 0.5s;
+  /* Music button — in title flow initially */
+  #musicBtn {
+    margin-top: 1.5rem;
+    padding: 0.5em 1.4em;
+    border: 1px solid rgba(200,180,160,0.4);
+    border-radius: 2em;
+    background: rgba(200,180,160,0.08);
+    color: rgba(220,205,185,0.9);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(0.85rem, 2vw, 1rem);
+    font-weight: 300; font-style: italic;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    pointer-events: auto;
+    opacity: 0;
+    animation: scrollHintIn 2s ease-out 1.8s forwards, musicPulse 2.5s ease-in-out 3.5s infinite;
+    transition: border-color 0.3s, background 0.3s;
   }
+  @keyframes musicPulse {
+    0%, 100% { border-color: rgba(200,180,160,0.4); transform: scale(1); }
+    50% { border-color: rgba(200,180,160,0.8); transform: scale(1.05); }
+  }
+  #musicBtn:hover { background: rgba(200,180,160,0.15); border-color: rgba(200,180,160,0.7); }
+  #musicBtn.playing { animation: none; opacity: 1; border-color: rgba(200,180,160,0.2); }
+
+  /* Docked state — fixed bottom-right */
+  #musicBtn.docked {
+    position: fixed; right: 1.8rem; bottom: 1.8rem;
+    z-index: 200;
+    margin-top: 0;
+    font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+    padding: 0.4em 1.2em;
+    animation: none; opacity: 1;
+    background: rgba(15,13,11,0.7);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+
 </style>
 </head>
 <body>
@@ -175,11 +208,13 @@
 <div id="loader"><p>LADATAAN</p></div>
 <canvas id="c"></canvas>
 <div id="title">
-  <h1>Lillin Akvarellit</h1>
-  <p class="sub">scrollaa sukeltaaksesi</p>
+  <h1>Lilli</h1>
+  <p class="sub">„akvarellit"</p>
+  <button id="musicBtn" title="Musiikki päälle/pois">&#9835; äänet päälle</button>
+  <div id="scrollHint">scrollaa alas<br>&#8595;</div>
 </div>
-<div id="counter"></div>
-<div id="panelHint">[ S ] asetukset</div>
+
+<audio id="bgMusic" src="vivaldi-winter-largo.ogg" loop preload="auto"></audio>
 
 <!-- ===== SETTINGS PANEL ===== -->
 <div id="panel">
@@ -194,11 +229,11 @@
     <select id="sTransMode" style="flex:1;background:#1a1714;color:#c8b8a4;border:1px solid #2a2420;border-radius:3px;padding:3px 6px;font-size:10px;font-family:-apple-system,system-ui,sans-serif;cursor:pointer;">
       <option value="0">Radiaalinen</option>
       <option value="1">Akvarelli-bleed</option>
-      <option value="2">Kuva-reveal</option>
+      <option value="2" selected>Kuva-reveal</option>
     </select>
   </div>
-  <div class="ctrl"><label>Reuna-feather</label><input type="range" id="sFeather" min="0.01" max="0.3" step="0.005" value="0.06"><span class="val"></span></div>
-  <div class="ctrl"><label>Next-aloituskoko</label><input type="range" id="sNextScale" min="0.01" max="0.5" step="0.01" value="0.08"><span class="val"></span></div>
+  <div class="ctrl"><label>Reuna-feather</label><input type="range" id="sFeather" min="0.01" max="0.3" step="0.005" value="0.12"><span class="val"></span></div>
+  <div class="ctrl"><label>Next-aloituskoko</label><input type="range" id="sNextScale" min="0.01" max="0.5" step="0.01" value="0.01"><span class="val"></span></div>
 
   <div id="radialControls">
     <div class="ctrl"><label>Noise-skaala</label><input type="range" id="sNoiseScale" min="0.5" max="12" step="0.1" value="3.5"><span class="val"></span></div>
@@ -208,40 +243,40 @@
   </div>
 
   <div id="watercolorControls" style="display:none">
-    <div class="ctrl"><label>Warp-skaala</label><input type="range" id="sWarpScale" min="1" max="8" step="0.1" value="3"><span class="val"></span></div>
-    <div class="ctrl"><label>Warp-voimakkuus</label><input type="range" id="sWarpIntensity" min="0.05" max="0.8" step="0.01" value="0.3"><span class="val"></span></div>
-    <div class="ctrl"><label>Warp-nopeus</label><input type="range" id="sWarpSpeed" min="0" max="0.5" step="0.005" value="0.12"><span class="val"></span></div>
-    <div class="ctrl"><label>Värivuoto</label><input type="range" id="sBleed" min="0" max="0.05" step="0.001" value="0.015"><span class="val"></span></div>
+    <div class="ctrl"><label>Warp-skaala</label><input type="range" id="sWarpScale" min="1" max="8" step="0.1" value="1.5"><span class="val"></span></div>
+    <div class="ctrl"><label>Warp-voimakkuus</label><input type="range" id="sWarpIntensity" min="0.05" max="0.8" step="0.01" value="0.06"><span class="val"></span></div>
+    <div class="ctrl"><label>Warp-nopeus</label><input type="range" id="sWarpSpeed" min="0" max="0.5" step="0.005" value="0.05"><span class="val"></span></div>
+    <div class="ctrl"><label>Värivuoto</label><input type="range" id="sBleed" min="0" max="0.05" step="0.001" value="0"><span class="val"></span></div>
   </div>
 
   <div id="revealControls" style="display:none">
     <div class="ctrl"><label>Reveal-nopeus</label><input type="range" id="sRevealSpeed" min="0.2" max="1.0" step="0.01" value="0.55"><span class="val"></span></div>
     <div class="ctrl"><label>Kanavasplit</label><input type="range" id="sChannelSplit" min="0" max="1.0" step="0.01" value="0"><span class="val"></span></div>
-    <div class="ctrl"><label>Reunahehku</label><input type="range" id="sEdgeGlow" min="0" max="1.5" step="0.02" value="0.5"><span class="val"></span></div>
-    <div class="ctrl"><label>Pigmenttireuna</label><input type="range" id="sEdgeDarken" min="0" max="1.0" step="0.02" value="0.4"><span class="val"></span></div>
-    <div class="ctrl"><label>Maski-zoom</label><input type="range" id="sRevealZoom" min="0" max="1.5" step="0.01" value="0.3"><span class="val"></span></div>
+    <div class="ctrl"><label>Reunahehku</label><input type="range" id="sEdgeGlow" min="0" max="1.5" step="0.02" value="0"><span class="val"></span></div>
+    <div class="ctrl"><label>Pigmenttireuna</label><input type="range" id="sEdgeDarken" min="0" max="1.0" step="0.02" value="0"><span class="val"></span></div>
+    <div class="ctrl"><label>Maski-zoom</label><input type="range" id="sRevealZoom" min="0" max="1.5" step="0.01" value="0.82"><span class="val"></span></div>
   </div>
 
-  <div class="ctrl"><label>Black burn joka N:s</label><input type="range" id="sBlackBurnEvery" min="0" max="20" step="1" value="5"><span class="val"></span></div>
+  <div class="ctrl"><label>Black burn joka N:s</label><input type="range" id="sBlackBurnEvery" min="0" max="20" step="1" value="0"><span class="val"></span></div>
 
   <h2>Zoom & liike</h2>
-  <div class="ctrl"><label>Zoom-teho</label><input type="range" id="sZoomPow" min="1.5" max="40" step="0.5" value="7"><span class="val"></span></div>
+  <div class="ctrl"><label>Zoom-teho</label><input type="range" id="sZoomPow" min="1.5" max="40" step="0.5" value="1.5"><span class="val"></span></div>
   <div class="ctrl"><label>Barrel</label><input type="range" id="sBarrel" min="0" max="1.0" step="0.01" value="0.15"><span class="val"></span></div>
   <div class="ctrl"><label>Parallaksi</label><input type="range" id="sParallax" min="0" max="0.06" step="0.002" value="0.015"><span class="val"></span></div>
   <div class="ctrl"><label>Zoom mouse</label><input type="range" id="sZoomMouse" min="0" max="0.4" step="0.005" value="0.06"><span class="val"></span></div>
 
   <h2>Post-efektit</h2>
   <div class="toggle"><label>Kromaattinen aberraatio</label><input type="checkbox" id="tAber" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
-  <div class="ctrl"><label>Aber. määrä</label><input type="range" id="sAber" min="0" max="0.06" step="0.001" value="0.015"><span class="val"></span></div>
+  <div class="ctrl"><label>Aber. määrä</label><input type="range" id="sAber" min="0" max="0.06" step="0.001" value="0.021"><span class="val"></span></div>
 
   <div class="toggle"><label>Vinjetti</label><input type="checkbox" id="tVig" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
-  <div class="ctrl"><label>Vig. tummuus</label><input type="range" id="sVig" min="0" max="1" step="0.02" value="0.55"><span class="val"></span></div>
+  <div class="ctrl"><label>Vig. tummuus</label><input type="range" id="sVig" min="0" max="1" step="0.02" value="1"><span class="val"></span></div>
 
   <div class="toggle"><label>Filmirae</label><input type="checkbox" id="tGrain" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
-  <div class="ctrl"><label>Rae-määrä</label><input type="range" id="sGrain" min="0" max="0.08" step="0.002" value="0.025"><span class="val"></span></div>
+  <div class="ctrl"><label>Rae-määrä</label><input type="range" id="sGrain" min="0" max="0.08" step="0.002" value="0"><span class="val"></span></div>
 
   <div class="toggle"><label>Mouse glow</label><input type="checkbox" id="tGlow" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
-  <div class="ctrl"><label>Glow-määrä</label><input type="range" id="sGlow" min="0" max="1" step="0.02" value="0.25"><span class="val"></span></div>
+  <div class="ctrl"><label>Glow-määrä</label><input type="range" id="sGlow" min="0" max="1" step="0.02" value="0.28"><span class="val"></span></div>
 
   <div class="toggle"><label>Värigreidaus</label><input type="checkbox" id="tColor" checked><span class="sw" onclick="this.previousElementSibling.click()"></span></div>
 
@@ -484,6 +519,10 @@ void main() {
       boundaryR = smoothstep(rp - feath, rp + feath, lumaR);
       boundaryB = smoothstep(rp - feath, rp + feath, lumaB);
     }
+    // Force boundary to zero near end of transition to prevent flash on image swap
+    float endFade = smoothstep(1.0, 0.93, rp);
+    boundary *= endFade;
+    if (boundaryR >= 0.0) { boundaryR *= endFade; boundaryB *= endFade; }
   }
 
   // ---- Sample current ----
@@ -586,27 +625,27 @@ void main() {
 // ===== SETTINGS OBJECT =====
 const DEFAULTS = {
   speed: 0.001, lerp: 0.06, noiseScale: 3.5, noiseSpeed: 0.3,
-  noiseAmp: 0.1, feather: 0.06, radius: 1.3, nextScale: 0.08,
-  transMode: 0,
-  warpScale: 3, warpIntensity: 0.3, warpSpeed: 0.12, bleed: 0.015,
+  noiseAmp: 0.1, feather: 0.12, radius: 1.3, nextScale: 0.01,
+  transMode: 2,
+  warpScale: 1.5, warpIntensity: 0.06, warpSpeed: 0.05, bleed: 0,
   revealSpeed: 0.55,
-  revealZoom: 0.3,
+  revealZoom: 0.82,
   channelSplit: 0,
-  edgeGlow: 0.5,
-  edgeDarken: 0.4,
-  blackBurnEvery: 5,
-  zoomPow: 7, barrel: 0.15, parallax: 0.015, zoomMouse: 0.06,
-  aber: 0.015, aberOn: true, vig: 0.55, vigOn: true,
-  grain: 0.025, grainOn: true, glow: 0.25, glowOn: true, colorOn: true,
+  edgeGlow: 0,
+  edgeDarken: 0,
+  blackBurnEvery: 0,
+  zoomPow: 1.5, barrel: 0.15, parallax: 0.015, zoomMouse: 0.06,
+  aber: 0.021, aberOn: true, vig: 1, vigOn: true,
+  grain: 0, grainOn: true, glow: 0.28, glowOn: true, colorOn: true,
 };
 const CURVE_DEFAULTS = {
-  x1: 0.2, y1: 0.0,       // handle for start (0,0)
-  mx: 0.5, my: 0.5,        // mid point (on curve)
-  mhx: 0.35, mhy: 0.5,     // mid handle (left side; right side is mirrored)
-  x2: 0.8, y2: 1.0,        // handle for end (1,1)
-  endX: 1.0,               // x where curve reaches max (1.0 = normal end)
-  midEnabled: true,         // mid pivot point enabled
-  mirrorHandles: false,     // mirror cp1 ↔ cp2
+  x1: 0.2823529411764706, y1: 0.0,
+  mx: 0.5, my: 0.5,
+  mhx: 0.38823529411764707, mhy: 0.278980152027027,
+  x2: 0.6431372549019608, y2: 1.0,
+  endX: 1.0,
+  midEnabled: true,
+  mirrorHandles: false,
 };
 
 const STORAGE_KEY = 'lillinAkvarellit_settings';
@@ -1188,15 +1227,40 @@ async function init() {
 
   // Panel toggle
   const panel = document.getElementById('panel');
-  const panelHint = document.getElementById('panelHint');
   window.addEventListener('keydown', (e) => {
     if (e.key === 's' || e.key === 'S') {
       if (e.metaKey || e.ctrlKey) return; // don't hijack save
       panelOpen = !panelOpen;
       panel.classList.toggle('open', panelOpen);
       document.body.classList.toggle('panel-open', panelOpen);
-      panelHint.style.opacity = panelOpen ? '0' : '1';
       e.preventDefault();
+    }
+  });
+
+  // Background music
+  const bgMusic = document.getElementById('bgMusic');
+  const musicBtn = document.getElementById('musicBtn');
+  bgMusic.volume = 0.4;
+
+  // Autoplay with sound (browsers may block this — first interaction will resume)
+  const playPromise = bgMusic.play();
+  if (playPromise) playPromise.then(() => {
+    musicBtn.classList.add('playing');
+    musicBtn.innerHTML = '&#9835; musiikki päällä';
+  }).catch(() => {
+    // Autoplay blocked — will start when user clicks the music button
+  });
+
+  musicBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (bgMusic.paused) {
+      bgMusic.play();
+      musicBtn.classList.add('playing');
+      musicBtn.innerHTML = '&#9835; musiikki päällä';
+    } else {
+      bgMusic.pause();
+      musicBtn.classList.remove('playing');
+      musicBtn.innerHTML = '&#9835; äänet päälle';
     }
   });
 
@@ -1221,7 +1285,6 @@ async function init() {
   let smoothMouseX = 0.5, smoothMouseY = 0.5;
   let titleHidden = false;
   const titleEl = document.getElementById('title');
-  const counterEl = document.getElementById('counter');
   const progFill = document.getElementById('progFill');
 
   // Input
@@ -1266,14 +1329,15 @@ async function init() {
   const startTime = performance.now();
   let lastFrame = performance.now();
 
-  let prevCounterText = '';
   let prevProgWidth = '';
+  let visualProgress = 0;        // smoothed progress that waits for textures
+  let lastNxtReady = true;       // track when next texture first becomes ready
 
   function render(now) {
     requestAnimationFrame(render);
 
-    // Upload pending textures (max 1 per frame to avoid GPU stalls)
-    processPendingUploads(2);
+    // Upload pending textures (spread GPU cost across frames)
+    processPendingUploads(3);
 
     // Frame-rate independent lerp
     const dt = Math.min((now - lastFrame) / 1000, 0.05); // cap at 50ms to avoid jumps after tab switch
@@ -1288,19 +1352,56 @@ async function init() {
     smoothMouseY += (mouseY - smoothMouseY) * mouseLerp;
 
     // Proactive preloading: keep textures loaded ahead of scroll position
-    loadTexture(currentIndex + 2); loadTexture(currentIndex + 3);
+    loadTexture(currentIndex + 1); loadTexture(currentIndex + 2);
+    loadTexture(currentIndex + 3); loadTexture(currentIndex + 4);
 
     if (progress >= 1.0 && targetProgress >= 1.0 && currentIndex < total - 2) {
       currentIndex++; progress -= 1.0; targetProgress -= 1.0;
+      visualProgress = 0; lastNxtReady = true;
     } else if (progress <= 0.0 && targetProgress <= 0.0 && currentIndex > 0) {
       currentIndex--; progress += 1.0; targetProgress += 1.0;
+      visualProgress = 1; lastNxtReady = true;
     }
     progress = Math.max(0, Math.min(1, progress));
 
     // Apply curve
     const curvedP = applyCurve(progress);
 
-    if (progress > 0.03 && !titleHidden) { titleEl.classList.add('hidden'); titleHidden = true; }
+    // Title: fly towards camera + black bg fades out during first scroll
+    if (currentIndex === 0 && progress <= 1) {
+      const t = progress; // 0 → 1
+      const scale = 1 + t * 4;         // 1× → 5× zoom
+      const opacity = Math.max(0, 1 - t * 2.5); // text fades by 40%
+      const bgOpacity = Math.max(0, 1 - t * 1.5); // black bg fades by ~67%
+      titleEl.style.transform = `scale(${scale})`;
+      titleEl.style.opacity = opacity;
+      titleEl.style.background = `rgba(10,9,8,${bgOpacity})`;
+      titleHidden = opacity <= 0;
+    } else if (currentIndex === 0 && progress > 1) {
+      titleEl.style.opacity = 0;
+      titleHidden = true;
+    } else if (currentIndex > 0) {
+      titleEl.style.opacity = 0;
+      titleHidden = true;
+    }
+    // Return title when scrolled back to start
+    if (currentIndex === 0 && progress <= 0.01 && titleHidden) {
+      titleEl.style.transform = 'scale(1)';
+      titleEl.style.opacity = 1;
+      titleEl.style.background = 'rgba(10,9,8,1)';
+      titleHidden = false;
+    }
+
+    // Dock music button to corner when title fades, undock when title returns
+    if (titleHidden && !musicBtn.classList.contains('docked')) {
+      document.body.appendChild(musicBtn);
+      musicBtn.classList.add('docked');
+    } else if (!titleHidden && musicBtn.classList.contains('docked')) {
+      musicBtn.classList.remove('docked');
+      titleEl.insertBefore(musicBtn, document.getElementById('scrollHint'));
+    }
+
+
 
     const ci = ((currentIndex % total) + total) % total;
     const ni = (((currentIndex + 1) % total) + total) % total;
@@ -1311,12 +1412,14 @@ async function init() {
     const burnN = Math.round(S.blackBurnEvery);
     const isBlackBurn = burnN > 0 && (currentIndex + 1) % burnN === 0;
     let nxtTex;
+    let nxtReady = true;
     if (isBlackBurn) {
       nxtTex = blackEntry;
     } else {
       const nxtTexRaw = texCache[ni] || loadTexture(ni);
       ensureUploaded(nxtTexRaw);
-      nxtTex = nxtTexRaw.ready ? nxtTexRaw : curTex;
+      nxtReady = nxtTexRaw.ready;
+      nxtTex = nxtReady ? nxtTexRaw : curTex;
     }
 
     gl.activeTexture(gl.TEXTURE0);
@@ -1335,7 +1438,21 @@ async function init() {
     gl.uniform1i(U.uReveal, 2);
     gl.uniform2f(U.uRevealSize, revTex.width, revTex.height);
 
-    gl.uniform1f(U.uProgress, curvedP);
+    // Smooth visual progress: holds at 0 while next texture loads, then lerps to catch up
+    if (!nxtReady) {
+      visualProgress = 0;
+      lastNxtReady = false;
+    } else {
+      if (!lastNxtReady) {
+        // Texture just became ready — start visual progress from 0 so it fades in smoothly
+        visualProgress = 0;
+        lastNxtReady = true;
+      }
+      // Lerp visual progress toward actual curved progress
+      visualProgress += (curvedP - visualProgress) * Math.min(1, dt * 8);
+      if (Math.abs(curvedP - visualProgress) < 0.001) visualProgress = curvedP;
+    }
+    gl.uniform1f(U.uProgress, visualProgress);
     gl.uniform1f(U.uLinearProgress, progress);
     gl.uniform2f(U.uMouse, smoothMouseX, smoothMouseY);
     gl.uniform1f(U.uTime, (performance.now() - startTime) * 0.001);
@@ -1379,8 +1496,6 @@ async function init() {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     // UI updates (only write DOM when values change)
-    const counterText = `${currentIndex + 1} / ${total}`;
-    if (counterText !== prevCounterText) { counterEl.textContent = counterText; prevCounterText = counterText; }
     const progWidth = (progress * 100).toFixed(1) + '%';
     if (progWidth !== prevProgWidth) { progFill.style.width = progWidth; prevProgWidth = progWidth; }
     if (panelOpen) drawCurve(progress);
